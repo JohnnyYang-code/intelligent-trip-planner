@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from app.config.settings import get_settings; s = get_settings\\(\\); print\\(''app_name:'', s.app_name\\); print\\(''llm_provider:'', s.llm_provider\\); print\\(''poi_provider:'', s.poi_provider\\)\")",
+      "Bash(python3 -c \"from app.config.settings import get_settings; s = get_settings\\(\\); print\\(''app_name:'', s.app_name\\); print\\(''llm_provider:'', s.llm_provider\\); print\\(''poi_provider:'', s.poi_provider\\)\")",
+      "Bash(pip3 install:*)",
+      "Bash(python3 -m py_compile app/config/settings.py)",
+      "Bash(python3 -m py_compile main.py)",
+      "Bash(python3 -m py_compile app/schemas/common.py app/schemas/trip_request.py app/schemas/persona.py app/schemas/poi.py app/schemas/itinerary.py)",
+      "Bash(python3 -m py_compile app/schemas/common.py app/schemas/trip_request.py app/schemas/persona.py app/schemas/poi.py app/schemas/itinerary.py app/integrations/poi/base.py app/integrations/poi/mock_provider.py app/integrations/poi/poi_factory.py app/integrations/maps/base.py app/integrations/maps/mock_provider.py app/integrations/maps/maps_factory.py app/integrations/weather/base.py app/integrations/weather/mock_provider.py app/integrations/weather/weather_factory.py app/core/persona_builder.py app/core/poi_scorer.py app/api/router.py main.py tests/test_persona_builder.py tests/test_poi_scorer.py)"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "destination": "beijing",
+  "duration_days": 3,
+  "budget_level": "mid_range",
+  "travel_pace": "moderate",
+  "interests": {
+    "history_culture": 0.9,
+    "nature_scenery": 0.4,
+    "food_dining": 0.6,
+    "shopping": 0.2,
+    "art_museum": 0.5,
+    "entertainment": 0.3,
+    "local_life": 0.5
+  },
+  "free_text_preferences": "I love ancient architecture but dislike crowded tourist traps.",
+  "constraints": {
+    "avoid_categories": [],
+    "accessibility_required": false,
+    "with_children": false,
+    "with_elderly": false,
+    "max_walking_km_per_day": 5.0
+  }
+}
