@@ -55,6 +55,46 @@ The LLM is responsible for:
 
 ---
 
+## Implementation Status
+
+The project is built in six sprints. Each sprint is self-contained and leaves the codebase in a runnable state.
+
+| Sprint | Scope | Status |
+|--------|-------|--------|
+| Sprint 1 | Schemas · Mock providers (POI / Maps / Weather) · `persona_builder` · `poi_scorer` · unit tests | ✅ Complete |
+| Sprint 2 | `day_allocator` · `route_optimizer` · `itinerary_builder` · `trip_planner` · allocator tests | ✅ Complete |
+| Sprint 3 | API layer (`health.py`, `trips.py`) · full `router.py` · curl end-to-end test | Planned |
+| Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | Planned |
+| Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) | Planned |
+| Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
+
+### What works right now (Sprint 2)
+
+The four-stage planning pipeline is fully implemented and can be exercised directly in Python:
+
+```python
+import asyncio
+from app.services.trip_planner import TripPlanner
+from app.schemas.trip_request import TripRequest, InterestWeights, TripConstraints
+from app.schemas.common import BudgetLevel, TravelPace
+
+planner = TripPlanner()
+request = TripRequest(
+    destination="beijing",
+    duration_days=3,
+    budget_level=BudgetLevel.mid_range,
+    travel_pace=TravelPace.moderate,
+    interests=InterestWeights(history_culture=0.9, food_dining=0.6),
+    constraints=TripConstraints(),
+)
+result = asyncio.run(planner.plan(request))
+print(result.model_dump_json(indent=2))
+```
+
+The HTTP endpoint (`POST /api/v1/trips/plan`) is available after Sprint 3.
+
+---
+
 ## MVP Scope
 
 The first version implements:
@@ -64,8 +104,8 @@ The first version implements:
 - POI model with scoring attributes
 - Local JSON mock POI data (Beijing, Shanghai, Chengdu)
 - POI filtering and scoring engine
-- Day allocation algorithm
-- Within-day route ordering
+- Day allocation algorithm (greedy + geographic clustering)
+- Within-day route ordering (nearest-neighbour + meal slot rules)
 - Weather forecast integration (mock)
 - LLM itinerary text generation (mock provider by default)
 - Single API endpoint: `POST /api/v1/trips/plan`
