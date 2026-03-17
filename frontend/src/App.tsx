@@ -10,14 +10,14 @@ import type {
 
 type InputMode = 'structured' | 'natural'
 
-const categoryOptions: { value: POICategory; label: string }[] = [
-  { value: 'history_culture', label: 'History & Culture' },
-  { value: 'nature_scenery', label: 'Nature & Scenery' },
-  { value: 'food_dining', label: 'Food & Dining' },
-  { value: 'shopping', label: 'Shopping' },
-  { value: 'art_museum', label: 'Art & Museum' },
-  { value: 'entertainment', label: 'Entertainment' },
-  { value: 'local_life', label: 'Local Life' },
+const categoryOptions: { value: POICategory; label: string; short: string }[] = [
+  { value: 'history_culture', label: 'History & Culture', short: 'History' },
+  { value: 'nature_scenery', label: 'Nature & Scenery', short: 'Nature' },
+  { value: 'food_dining', label: 'Food & Dining', short: 'Food' },
+  { value: 'shopping', label: 'Shopping', short: 'Shopping' },
+  { value: 'art_museum', label: 'Art & Museum', short: 'Museum' },
+  { value: 'entertainment', label: 'Entertainment', short: 'Fun' },
+  { value: 'local_life', label: 'Local Life', short: 'Local' },
 ]
 
 const structuredExample: StructuredTripRequest = {
@@ -32,6 +32,10 @@ const structuredExample: StructuredTripRequest = {
 
 const naturalExample =
   "I'd like to spend three days in Brisbane, focusing mainly on food, local neighborhoods, and a relaxed pace."
+
+function formatCategory(value: string) {
+  return value.replaceAll('_', ' ')
+}
 
 function App() {
   const [mode, setMode] = useState<InputMode>('structured')
@@ -65,6 +69,11 @@ function App() {
     return Object.entries(health.providers)
   }, [health])
 
+  const totalPois = useMemo(
+    () => result?.days.reduce((sum, day) => sum + day.pois.length, 0) ?? 0,
+    [result],
+  )
+
   const handleStructuredChange = <K extends keyof StructuredTripRequest>(
     key: K,
     value: StructuredTripRequest[K],
@@ -79,6 +88,26 @@ function App() {
       : [...current, category]
 
     handleStructuredChange('preferred_categories', next)
+  }
+
+  const resetAll = () => {
+    setStructuredForm({
+      destination: '',
+      duration_days: 3,
+      budget_level: 'mid_range',
+      travel_pace: 'moderate',
+      preferred_categories: [],
+      free_text_preferences: '',
+    })
+    setRawText('')
+    setResult(null)
+    setError(null)
+  }
+
+  const fillExample = () => {
+    setStructuredForm(structuredExample)
+    setRawText(naturalExample)
+    setError(null)
   }
 
   const handleSubmit = async () => {
@@ -116,34 +145,61 @@ function App() {
   return (
     <div className="app-shell">
       <header className="hero-panel">
-        <div>
+        <div className="hero-copy-block">
           <p className="eyebrow">Thesis Demo Frontend</p>
           <h1>Intelligent Trip Planning Assistant</h1>
           <p className="hero-copy">
-            A lightweight interface for demonstrating a hybrid trip planning system:
-            deterministic itinerary generation with LLM-based explanation and natural-language
-            input parsing.
+            A lightweight demo interface for a hybrid trip planning system. The structured
+            pipeline generates the itinerary; the LLM only supports natural-language parsing and
+            explanatory text.
           </p>
-        </div>
-        <div className="health-card">
-          <div className="health-header">
-            <h2>Backend Health</h2>
-            <span className={`status-pill ${healthLoading ? 'muted' : 'ok'}`}>
-              {healthLoading ? 'Checking…' : health?.status ?? 'Unavailable'}
-            </span>
+
+          <div className="hero-pills">
+            <span>Structured planning</span>
+            <span>Natural-language input parsing</span>
+            <span>LLM-generated explanation</span>
           </div>
-          <div className="provider-grid">
-            {providerEntries.map(([key, provider]) => (
-              <div key={key} className="provider-row">
-                <span className="provider-name">{key}</span>
-                <span className={`provider-state ${provider.available ? 'ok' : 'down'}`}>
-                  {provider.mode}
-                </span>
+        </div>
+
+        <div className="hero-side-stack">
+          <div className="mini-thesis-card">
+            <p className="eyebrow">System framing</p>
+            <div className="framing-flow">
+              <div>
+                <strong>Input layer</strong>
+                <span>Structured form or raw natural language</span>
               </div>
-            ))}
-            {!providerEntries.length && !healthLoading && (
-              <p className="muted-text">Health endpoint unavailable.</p>
-            )}
+              <div>
+                <strong>Planning core</strong>
+                <span>Persona → scoring → allocation → route ordering</span>
+              </div>
+              <div>
+                <strong>Explanation layer</strong>
+                <span>Overview, narratives, recommendation reasons</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="health-card">
+            <div className="health-header">
+              <h2>Backend Health</h2>
+              <span className={`status-pill ${healthLoading ? 'muted' : 'ok'}`}>
+                {healthLoading ? 'Checking…' : health?.status ?? 'Unavailable'}
+              </span>
+            </div>
+            <div className="provider-grid">
+              {providerEntries.map(([key, provider]) => (
+                <div key={key} className="provider-row">
+                  <span className="provider-name">{key}</span>
+                  <span className={`provider-state ${provider.available ? 'ok' : 'down'}`}>
+                    {provider.mode}
+                  </span>
+                </div>
+              ))}
+              {!providerEntries.length && !healthLoading && (
+                <p className="muted-text">Health endpoint unavailable.</p>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -169,6 +225,12 @@ function App() {
                 Natural language
               </button>
             </div>
+          </div>
+
+          <div className="input-mode-note">
+            {mode === 'structured'
+              ? 'Use a compact research-demo form that maps directly to the backend request schema.'
+              : 'Enter one sentence; the backend parses it into structured fields before running the same planning pipeline.'}
           </div>
 
           {mode === 'structured' ? (
@@ -201,7 +263,10 @@ function App() {
                   <select
                     value={structuredForm.budget_level}
                     onChange={(event) =>
-                      handleStructuredChange('budget_level', event.target.value as StructuredTripRequest['budget_level'])
+                      handleStructuredChange(
+                        'budget_level',
+                        event.target.value as StructuredTripRequest['budget_level'],
+                      )
                     }
                   >
                     <option value="budget">Budget</option>
@@ -216,7 +281,10 @@ function App() {
                 <select
                   value={structuredForm.travel_pace}
                   onChange={(event) =>
-                    handleStructuredChange('travel_pace', event.target.value as StructuredTripRequest['travel_pace'])
+                    handleStructuredChange(
+                      'travel_pace',
+                      event.target.value as StructuredTripRequest['travel_pace'],
+                    )
                   }
                 >
                   <option value="relaxed">Relaxed</option>
@@ -252,7 +320,7 @@ function App() {
                   onChange={(event) =>
                     handleStructuredChange('free_text_preferences', event.target.value)
                   }
-                  placeholder="Optional: mention soft preferences like food, crowd tolerance, walking preference, or atmosphere."
+                  placeholder="Optional: mention crowd tolerance, walking preference, food style, atmosphere, or soft constraints."
                 />
               </label>
             </div>
@@ -267,33 +335,18 @@ function App() {
                   placeholder="I'd like to spend three days in Brisbane, focusing mainly on food."
                 />
               </label>
-              <p className="muted-text">
-                The backend will parse this into structured fields, then run the same itinerary
-                planning pipeline.
-              </p>
+              <div className="example-callout">
+                <strong>Example prompt</strong>
+                <p>{naturalExample}</p>
+              </div>
             </div>
           )}
 
           <div className="action-row">
-            <button className="secondary" onClick={() => {
-              setStructuredForm(structuredExample)
-              setRawText(naturalExample)
-            }}>
+            <button className="secondary" onClick={fillExample}>
               Fill example
             </button>
-            <button className="secondary" onClick={() => {
-              setStructuredForm({
-                destination: '',
-                duration_days: 3,
-                budget_level: 'mid_range',
-                travel_pace: 'moderate',
-                preferred_categories: [],
-                free_text_preferences: '',
-              })
-              setRawText('')
-              setResult(null)
-              setError(null)
-            }}>
+            <button className="secondary" onClick={resetAll}>
               Reset
             </button>
             <button className="primary" disabled={!canSubmit || loading} onClick={handleSubmit}>
@@ -303,22 +356,31 @@ function App() {
         </section>
 
         <section className="panel result-panel">
-          <div className="section-heading">
+          <div className="section-heading result-heading">
             <div>
               <p className="eyebrow">Output</p>
-              <h2>Itinerary result</h2>
+              <h2>Planner result</h2>
             </div>
+            {result && (
+              <div className="result-badges">
+                <span>{result.duration_days} days</span>
+                <span>{totalPois} POIs</span>
+                <span>¥{Math.round(result.total_estimated_cost_cny)}</span>
+              </div>
+            )}
           </div>
 
           {error && <div className="message error">{error}</div>}
-          {loading && <div className="message loading">Calling backend and assembling itinerary…</div>}
+          {loading && (
+            <div className="message loading">Calling backend and assembling itinerary…</div>
+          )}
 
           {!loading && !result && !error && (
             <div className="empty-state">
               <h3>Ready for demo</h3>
               <p>
                 Submit either a structured request or a natural-language description to display
-                the generated itinerary here.
+                the generated itinerary, persona summary, overview, and day-by-day schedule here.
               </p>
             </div>
           )}
@@ -337,26 +399,30 @@ function App() {
                       <strong>{result.duration_days}</strong>
                     </div>
                     <div>
+                      <span>Total POIs</span>
+                      <strong>{totalPois}</strong>
+                    </div>
+                    <div>
                       <span>Estimated cost</span>
                       <strong>¥{Math.round(result.total_estimated_cost_cny)}</strong>
                     </div>
                   </div>
                 </div>
 
-                <div className="summary-block">
-                  <h4>Persona summary</h4>
-                  <p>{result.persona_summary}</p>
+                <div className="summary-grid">
+                  <div className="summary-block feature-block">
+                    <h4>Planner persona</h4>
+                    <p>{result.persona_summary}</p>
+                  </div>
+
+                  <div className="summary-block feature-block accent-block">
+                    <h4>LLM-generated overview</h4>
+                    <p>{result.overview || 'No overview returned for this run.'}</p>
+                  </div>
                 </div>
 
-                {result.overview && (
-                  <div className="summary-block">
-                    <h4>Overview</h4>
-                    <p>{result.overview}</p>
-                  </div>
-                )}
-
                 {result.planning_notes.length > 0 && (
-                  <div className="summary-block">
+                  <div className="summary-block notes-block">
                     <h4>Planning notes</h4>
                     <ul>
                       {result.planning_notes.map((note) => (
@@ -379,45 +445,89 @@ function App() {
                       <p className="eyebrow">{day.date_label}</p>
                       <h3>{day.theme || `Day ${day.day_number}`}</h3>
                     </div>
-                    {day.weather && (
-                      <div className="weather-badge">
-                        <strong>{day.weather.condition}</strong>
-                        <span>
-                          {Math.round(day.weather.temp_low_c)}–{Math.round(day.weather.temp_high_c)}°C
-                        </span>
+                    <div className="day-header-side">
+                      <span className="day-poi-count">{day.pois.length} stops</span>
+                      {day.weather && (
+                        <div className="weather-badge">
+                          <strong>{day.weather.condition}</strong>
+                          <span>
+                            {Math.round(day.weather.temp_low_c)}–
+                            {Math.round(day.weather.temp_high_c)}°C
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="day-meta-grid">
+                    {day.weather?.travel_advisory && (
+                      <div className="day-meta-card">
+                        <span className="meta-label">Weather advisory</span>
+                        <p>{day.weather.travel_advisory}</p>
+                      </div>
+                    )}
+                    {day.narrative && (
+                      <div className="day-meta-card narrative-card">
+                        <span className="meta-label">Narrative</span>
+                        <p>{day.narrative}</p>
                       </div>
                     )}
                   </div>
 
-                  {day.weather?.travel_advisory && (
-                    <p className="weather-note">{day.weather.travel_advisory}</p>
-                  )}
-
-                  {day.narrative && <p className="narrative">{day.narrative}</p>}
-
-                  <div className="poi-list">
-                    {day.pois.map((scheduledPoi) => (
-                      <div key={`${day.day_number}-${scheduledPoi.poi.id}`} className="poi-card">
-                        <div className="poi-time">
-                          <span>{scheduledPoi.suggested_start_time}</span>
-                          <small>{scheduledPoi.suggested_duration_hours}h</small>
+                  <div className="timeline">
+                    {day.pois.map((scheduledPoi, index) => (
+                      <div key={`${day.day_number}-${scheduledPoi.poi.id}`} className="timeline-row">
+                        <div className="timeline-rail">
+                          <div className="timeline-dot" />
+                          {index !== day.pois.length - 1 && <div className="timeline-line" />}
                         </div>
-                        <div className="poi-content">
-                          <div className="poi-heading">
-                            <h4>{scheduledPoi.poi.name}</h4>
-                            <span className="category-tag">
-                              {scheduledPoi.poi.category.replaceAll('_', ' ')}
-                            </span>
+
+                        <div className="poi-card timeline-card">
+                          <div className="poi-time-card">
+                            <span className="time-main">{scheduledPoi.suggested_start_time}</span>
+                            <small>{scheduledPoi.suggested_duration_hours}h</small>
                           </div>
-                          <p className="poi-meta">
-                            {scheduledPoi.poi.district} · ¥{Math.round(scheduledPoi.poi.avg_cost_cny)}
-                            {scheduledPoi.poi.opening_hours
-                              ? ` · ${scheduledPoi.poi.opening_hours}`
-                              : ''}
-                          </p>
-                          {scheduledPoi.recommendation_reason && (
-                            <p className="poi-reason">{scheduledPoi.recommendation_reason}</p>
-                          )}
+
+                          <div className="poi-content">
+                            <div className="poi-heading">
+                              <div>
+                                <h4>{scheduledPoi.poi.name}</h4>
+                                <p className="poi-subtitle">{scheduledPoi.poi.district}</p>
+                              </div>
+                              <span className="category-tag">
+                                {formatCategory(scheduledPoi.poi.category)}
+                              </span>
+                            </div>
+
+                            <div className="poi-meta-row">
+                              <span>¥{Math.round(scheduledPoi.poi.avg_cost_cny)}</span>
+                              <span>{scheduledPoi.poi.budget_tier}</span>
+                              {scheduledPoi.poi.opening_hours && (
+                                <span>{scheduledPoi.poi.opening_hours}</span>
+                              )}
+                            </div>
+
+                            {scheduledPoi.recommendation_reason && (
+                              <p className="poi-reason highlighted-reason">
+                                {scheduledPoi.recommendation_reason}
+                              </p>
+                            )}
+
+                            {(scheduledPoi.poi.description || scheduledPoi.poi.highlights.length > 0) && (
+                              <div className="poi-extra">
+                                {scheduledPoi.poi.description && (
+                                  <p className="poi-description">{scheduledPoi.poi.description}</p>
+                                )}
+                                {scheduledPoi.poi.highlights.length > 0 && (
+                                  <div className="inline-tags">
+                                    {scheduledPoi.poi.highlights.slice(0, 3).map((highlight) => (
+                                      <span key={highlight}>{highlight}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -428,6 +538,13 @@ function App() {
           )}
         </section>
       </main>
+
+      <section className="footer-note panel">
+        <p>
+          This frontend is intentionally minimal: one page, two input modes, and a clear display
+          of how structured planning output differs from LLM-generated explanation.
+        </p>
+      </section>
     </div>
   )
 }
