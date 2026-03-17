@@ -64,11 +64,11 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 1 | Schemas · Mock providers (POI / Maps / Weather) · `persona_builder` · `poi_scorer` · unit tests | ✅ Complete |
 | Sprint 2 | `day_allocator` · `route_optimizer` · `itinerary_builder` · `trip_planner` · allocator tests | ✅ Complete |
 | Sprint 3 | API layer (`health.py`, `trips.py`) · full `router.py` · curl end-to-end test | ✅ Complete |
-| Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | Planned |
+| Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | ✅ Complete |
 | Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) | Planned |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 3)
+### What works right now (Sprint 4)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -96,7 +96,7 @@ curl -X POST http://localhost:8000/api/v1/trips/plan \
 
 Interactive API docs: `http://localhost:8000/docs`
 
-LLM-generated fields (`overview`, `narrative`, `tips`, `recommendation_reason`) are empty strings until Sprint 4.
+All response fields are populated. LLM-generated fields (`overview`, `narrative`, `recommendation_reason`) use template text in mock mode and real AI-generated text when an API key is configured.
 
 ---
 
@@ -296,7 +296,7 @@ By default, all external services run in mock mode. No API keys are required.
 | `POI_PROVIDER=mock` | Reads from `app/data/mock/{destination}_pois.json` |
 | `MAPS_PROVIDER=mock` | Computes straight-line distance using Haversine formula |
 | `WEATHER_PROVIDER=mock` | Returns seasonally-appropriate fixed forecast data |
-| `LLM_PROVIDER=mock` | Generates itinerary text from Python string templates |
+| `LLM_PROVIDER=mock` | Generates overview, narratives, and POI reasons from Python templates; infers soft preferences via keyword matching |
 
 To activate a real provider, set its key in `.env` and change its `_PROVIDER` variable:
 

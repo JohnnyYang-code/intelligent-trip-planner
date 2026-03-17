@@ -5,6 +5,73 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Sprint 4] — 2026-03-18
+
+### Added
+
+**LLM abstraction layer** (`app/llm/`)
+
+- `base.py` — `BaseLLMProvider` ABC with four typed async methods:
+  `generate_overview`, `generate_day_narrative`, `generate_poi_reason`,
+  `infer_soft_preferences`. Typed signatures keep each generation task
+  explicit and testable without parsing prompt strings.
+
+- `prompt_templates.py` — Four pure functions (`build_overview_prompt`,
+  `build_day_narrative_prompt`, `build_poi_reason_prompt`,
+  `build_soft_preference_prompt`) that construct prompt strings for real
+  LLM providers. Mock provider bypasses these entirely.
+
+- `mock_provider.py` — Deterministic template-based implementation.
+  `infer_soft_preferences` uses lightweight keyword matching to detect
+  tags such as `ancient_architecture`, `avoid_crowds`, and `food_focused`
+  without any API call. All other methods return fixed template strings.
+
+- `openai_provider.py` — Wraps the OpenAI `AsyncOpenAI` client with lazy
+  import (safe if `openai` package is absent). Each method builds a prompt
+  via `prompt_templates`, calls `chat.completions.create`, and falls back
+  to `MockLLMProvider` on any exception.
+
+- `claude_provider.py` — Same structure as OpenAI provider, using the
+  Anthropic `AsyncAnthropic` client and `messages.create`. Identical
+  fallback behavior.
+
+- `llm_factory.py` — `create_llm_provider(settings)` returns the
+  configured provider. Falls back to mock when a real provider is selected
+  but its API key is missing; logs a warning instead of raising.
+
+**Service layer updates**
+
+- `app/services/itinerary_builder.py` — Extended `build()` signature with
+  three optional LLM content parameters: `overview: str`, `day_narratives:
+  list[str]`, `poi_reasons: dict[str, str]`. When provided, `poi_reasons`
+  values are written directly to `ScheduledPOI.recommendation_reason`.
+
+- `app/services/trip_planner.py` — LLM generation inserted after Stage 4:
+  1. Soft-preference inference runs immediately after Stage 1 if
+     `free_text_preferences` is set; result is written to
+     `persona.inferred_soft_preferences`.
+  2. Overview, all day narratives, and all POI reasons are generated in
+     parallel via `asyncio.gather` after all four planning stages complete.
+  3. LLM results are passed to `itinerary_builder.build()`.
+  Any individual LLM failure is caught and logged; the itinerary is
+  returned with an empty string for that field rather than raising.
+
+### Design decisions
+
+- **LLM runs after all four planning stages.** It never influences POI
+  selection, scoring, allocation, or routing — only text content.
+- **Parallel generation.** `asyncio.gather` issues overview, all day
+  narratives, and all POI reasons concurrently, minimising latency when
+  using a real LLM provider.
+- **Graceful degradation.** Every real provider method wraps its API call
+  in a try/except and falls back to `MockLLMProvider`. The pipeline never
+  fails due to LLM unavailability.
+- **No LangChain dependency.** All providers are thin SDK wrappers;
+  LangChain may be added behind `BaseLLMProvider` in future without
+  changing any other module.
+
+---
+
 ## [Sprint 3] — 2026-03-18
 
 ### Added
