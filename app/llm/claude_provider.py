@@ -95,6 +95,34 @@ class ClaudeProvider(BaseLLMProvider):
             return [tag.strip() for tag in result.split(",") if tag.strip()]
         return await _FALLBACK.infer_soft_preferences(free_text)
 
+    async def parse_natural_language_request(self, raw_text: str) -> dict:
+        """
+        Ask Claude to return a strict JSON object with no extra prose.
+        Strips markdown code fences that Claude occasionally adds.
+        Falls back to MockLLMProvider on any error.
+        """
+        import json
+        import re
+
+        client = self._get_client()
+        if client is None:
+            return await _FALLBACK.parse_natural_language_request(raw_text)
+        prompt = pt.build_parse_trip_prompt(raw_text)
+        try:
+            response = await client.messages.create(
+                model=self._model,
+                max_tokens=350,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            # Strip markdown fences (```json ... ```) Claude sometimes adds
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+            return json.loads(raw)
+        except Exception as exc:
+            logger.warning("Claude NL parse failed: %s — using mock fallback", exc)
+            return await _FALLBACK.parse_natural_language_request(raw_text)
+
     def is_available(self) -> bool:
         return bool(self._api_key)
 

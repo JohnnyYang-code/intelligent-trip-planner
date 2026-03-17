@@ -80,3 +80,52 @@ def build_soft_preference_prompt(free_text: str) -> str:
         f"If no clear preferences are found, return an empty string.\n"
         f"Do not include any explanation or punctuation other than commas.\n"
     )
+
+
+def build_parse_trip_prompt(raw_text: str) -> str:
+    """
+    Build a prompt that instructs the LLM to extract structured trip fields
+    from a free-text description and return them as a strict JSON object.
+
+    The LLM must return ONLY the JSON object — no prose, no markdown fences.
+    """
+    return (
+        "You are a travel assistant that extracts structured information from "
+        "trip descriptions. Extract the fields below from the user message and "
+        "return them as a single JSON object.\n\n"
+        f'User message: "{raw_text}"\n\n'
+        "Return ONLY a valid JSON object with exactly these fields "
+        "(use null for any field not mentioned):\n"
+        "{\n"
+        '  "destination": <city name as a string, or null>,\n'
+        '  "duration_days": <integer between 1 and 14, or null>,\n'
+        '  "start_date": <"YYYY-MM-DD" string, or null>,\n'
+        '  "end_date": <"YYYY-MM-DD" string, or null>,\n'
+        '  "budget_level": <"budget" | "mid_range" | "luxury" | null>,\n'
+        '  "travel_pace": <"relaxed" | "moderate" | "intensive" | null>,\n'
+        '  "preferred_categories": <array of zero or more values from '
+        '["history_culture", "nature_scenery", "food_dining", "shopping", '
+        '"art_museum", "entertainment", "local_life"], or null>,\n'
+        '  "free_text_preferences": <qualitative soft preferences not captured '
+        'by the fields above, as a plain string, or null>\n'
+        "}\n\n"
+        "Rules:\n"
+        "- Output ONLY the JSON object. No explanation, no markdown, no code blocks.\n"
+        "- duration_days: set if explicitly stated (e.g. 'three days' → 3). "
+        "If only dates are given, leave null and set start_date/end_date instead.\n"
+        "- preferred_categories: map interests to the closest category value. "
+        "Examples: food/eating/cuisine → food_dining, "
+        "history/heritage/temple → history_culture, "
+        "nature/park/beach/outdoor → nature_scenery, "
+        "art/museum/gallery → art_museum, "
+        "shopping/market/mall → shopping, "
+        "local/neighbourhood/authentic → local_life, "
+        "entertainment/nightlife/show → entertainment.\n"
+        "- free_text_preferences: capture only qualitative statements that cannot "
+        "be expressed as categories (e.g. 'I hate crowds', 'vegetarian only', "
+        "'prefer quiet places'). Do not repeat information already captured above.\n"
+        "- budget_level: 'budget' for cheap/affordable, 'luxury' for high-end/five-star, "
+        "'mid_range' only if explicitly stated. Otherwise null.\n"
+        "- travel_pace: 'relaxed' for slow/leisurely, 'intensive' for packed/busy. "
+        "Otherwise null.\n"
+    )

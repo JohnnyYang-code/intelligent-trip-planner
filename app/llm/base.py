@@ -95,6 +95,20 @@ class BaseLLMProvider(ABC):
         ...
 
     @abstractmethod
+    async def parse_natural_language_request(self, raw_text: str) -> dict:
+        """
+        Extract structured trip fields from a free-text description.
+
+        Returns a dict with keys matching ParsedTripInput fields:
+          destination, duration_days, start_date, end_date,
+          budget_level, travel_pace, preferred_categories, free_text_preferences
+
+        All keys must be present in the returned dict; unextracted values are None.
+        This method must never raise — return a best-effort dict on any failure.
+        """
+        ...
+
+    @abstractmethod
     def is_available(self) -> bool:
         """Return True if this provider is properly configured and operational."""
         ...

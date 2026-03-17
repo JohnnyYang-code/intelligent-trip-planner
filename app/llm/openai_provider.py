@@ -96,6 +96,31 @@ class OpenAIProvider(BaseLLMProvider):
             return [tag.strip() for tag in result.split(",") if tag.strip()]
         return await _FALLBACK.infer_soft_preferences(free_text)
 
+    async def parse_natural_language_request(self, raw_text: str) -> dict:
+        """
+        Use OpenAI JSON mode (response_format=json_object) to guarantee
+        a parseable structured response with temperature=0 for determinism.
+        Falls back to MockLLMProvider on any error.
+        """
+        import json
+
+        client = self._get_client()
+        if client is None:
+            return await _FALLBACK.parse_natural_language_request(raw_text)
+        prompt = pt.build_parse_trip_prompt(raw_text)
+        try:
+            response = await client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=350,
+                temperature=0.0,
+                response_format={"type": "json_object"},
+            )
+            return json.loads(response.choices[0].message.content.strip())
+        except Exception as exc:
+            logger.warning("OpenAI NL parse failed: %s — using mock fallback", exc)
+            return await _FALLBACK.parse_natural_language_request(raw_text)
+
     def is_available(self) -> bool:
         return bool(self._api_key)
 

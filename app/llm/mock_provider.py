@@ -8,6 +8,8 @@ Used as the default provider and as the fallback when a real provider
 is misconfigured or unavailable.
 """
 
+import re
+
 from app.llm.base import BaseLLMProvider
 
 # Condition-specific weather notes injected into day narratives.
@@ -160,6 +162,133 @@ class MockLLMProvider(BaseLLMProvider):
         if lang == "en":
             return _infer_en(free_text.lower())
         return []
+
+    async def parse_natural_language_request(self, raw_text: str) -> dict:
+        """
+        Regex/keyword-based NL field extraction — no API required.
+
+        Supports English (primary) and Chinese (lightweight).
+        Returns a dict with all ParsedTripInput keys; unextracted values are None.
+        """
+        text = raw_text.strip()
+        lower = text.lower()
+        lang = _detect_language(text)
+
+        # ── destination ───────────────────────────────────────────────────────
+        destination = None
+        if lang == "zh":
+            # Chinese: look for city markers like "去X" "在X" "到X"
+            zh_dest = re.search(r"[去在到]([^\s，。！？,\.]{2,6}?)(?:[玩旅游游玩，。]|$)", text)
+            if zh_dest:
+                destination = zh_dest.group(1).strip()
+        else:
+            # English: capitalize word(s) after "in" or "to", stopping when
+            # the next word is lowercase (a verb/preposition) or at punctuation.
+            en_dest = re.search(
+                r"\b(?:in|to)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)"
+                r"(?=\s*[,.]|\s+[a-z]|$)",
+                text,
+            )
+            if en_dest:
+                destination = en_dest.group(1).strip()
+
+        # ── duration_days ─────────────────────────────────────────────────────
+        _WORD_TO_INT = {
+            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+        }
+        duration_days = None
+        dur_match = re.search(
+            r"\b(\d+|" + "|".join(_WORD_TO_INT) + r")\s*[-\s]?days?\b",
+            lower,
+        )
+        if dur_match:
+            raw_dur = dur_match.group(1)
+            duration_days = int(raw_dur) if raw_dur.isdigit() else _WORD_TO_INT.get(raw_dur)
+
+        if duration_days is None and lang == "zh":
+            zh_dur = re.search(r"(\d+)\s*天", text)
+            if zh_dur:
+                duration_days = int(zh_dur.group(1))
+
+        # ── ISO dates ─────────────────────────────────────────────────────────
+        start_date = end_date = None
+        iso_dates = re.findall(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+        if len(iso_dates) >= 2:
+            start_date, end_date = iso_dates[0], iso_dates[1]
+
+        # ── budget_level ──────────────────────────────────────────────────────
+        budget_level = None
+        if any(w in lower for w in ["budget", "cheap", "affordable", "low-cost"]):
+            budget_level = "budget"
+        elif any(w in lower for w in ["luxury", "five-star", "5-star", "splurge", "high-end"]):
+            budget_level = "luxury"
+        elif lang == "zh":
+            if any(w in text for w in ["便宜", "省钱", "经济"]):
+                budget_level = "budget"
+            elif any(w in text for w in ["奢华", "高端", "五星"]):
+                budget_level = "luxury"
+
+        # ── travel_pace ───────────────────────────────────────────────────────
+        travel_pace = None
+        if any(w in lower for w in ["relax", "leisurely", "slow", "easy-going"]):
+            travel_pace = "relaxed"
+        elif any(w in lower for w in ["intensive", "packed", "busy", "hectic", "fast-paced"]):
+            travel_pace = "intensive"
+        elif lang == "zh":
+            if any(w in text for w in ["轻松", "悠闲", "慢慢", "放松"]):
+                travel_pace = "relaxed"
+            elif any(w in text for w in ["紧凑", "密集", "多玩"]):
+                travel_pace = "intensive"
+
+        # ── preferred_categories ──────────────────────────────────────────────
+        _EN_CAT_KEYWORDS: dict[str, list[str]] = {
+            "history_culture":  ["history", "historic", "culture", "heritage", "temple", "palace", "ancient"],
+            "nature_scenery":   ["nature", "scenery", "outdoor", "park", "mountain", "beach", "hike", "hiking"],
+            "food_dining":      ["food", "dining", "eat", "restaurant", "cuisine", "foodie", "culinary"],
+            "shopping":         ["shop", "shopping", "market", "mall", "buy"],
+            "art_museum":       ["art", "museum", "gallery", "exhibition"],
+            "entertainment":    ["entertainment", "nightlife", "show", "concert", "theme park"],
+            "local_life":       ["local", "authentic", "neighbourhood", "neighborhood", "street life"],
+        }
+        _ZH_CAT_KEYWORDS: dict[str, list[str]] = {
+            "history_culture":  ["历史", "文化", "古迹", "寺庙", "遗址", "故宫"],
+            "nature_scenery":   ["自然", "风景", "公园", "山", "海", "户外"],
+            "food_dining":      ["美食", "吃", "餐厅", "小吃", "食物"],
+            "shopping":         ["购物", "商场", "市场", "买"],
+            "art_museum":       ["艺术", "博物馆", "画廊", "展览"],
+            "entertainment":    ["娱乐", "演出", "演唱会", "夜生活"],
+            "local_life":       ["当地", "本地", "地道", "街头"],
+        }
+        cat_keywords = _ZH_CAT_KEYWORDS if lang == "zh" else _EN_CAT_KEYWORDS
+        search_text = text if lang == "zh" else lower
+        preferred_categories = [
+            cat for cat, kws in cat_keywords.items()
+            if any(kw in search_text for kw in kws)
+        ] or None
+
+        # ── free_text_preferences ─────────────────────────────────────────────
+        # Capture qualitative soft preferences not expressible as categories
+        free_text_preferences = None
+        soft_keywords_en = ["hate", "avoid", "dislike", "love", "prefer",
+                             "vegetarian", "vegan", "crowd", "quiet", "wheelchair"]
+        soft_keywords_zh = ["讨厌", "不喜欢", "喜欢", "素食", "拥挤", "安静", "避开"]
+        if lang == "zh":
+            if any(w in text for w in soft_keywords_zh):
+                free_text_preferences = text
+        elif any(w in lower for w in soft_keywords_en):
+            free_text_preferences = text
+
+        return {
+            "destination": destination,
+            "duration_days": duration_days,
+            "start_date": start_date,
+            "end_date": end_date,
+            "budget_level": budget_level,
+            "travel_pace": travel_pace,
+            "preferred_categories": preferred_categories,
+            "free_text_preferences": free_text_preferences,
+        }
 
     def is_available(self) -> bool:
         return True

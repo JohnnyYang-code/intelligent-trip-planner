@@ -18,7 +18,11 @@ The result is a system that is both explainable and user-friendly — not a blac
 ## Core Design Idea
 
 ```
-User Input
+Optional: Natural Language Input (Sprint 5.6)
+    ↓
+LLM Input Parsing     ← extracts structured fields from free text
+    ↓
+User Input (structured TripRequest)
     ↓
 PersonaBuilder        ← builds traveler profile from preferences
     ↓
@@ -39,7 +43,7 @@ LLM Text Generation   ← narrates each day, explains recommendations, writes ov
 ItineraryResponse     ← structured JSON with full plan + natural language
 ```
 
-**The LLM does not plan the trip. It narrates it.**
+**The LLM does not plan the trip. It either parses user input or narrates the result — never both at once.**
 
 The structured pipeline decides:
 - which POIs to include
@@ -48,6 +52,7 @@ The structured pipeline decides:
 - with what time estimates
 
 The LLM is responsible for:
+- **parsing natural language input** into structured fields (Sprint 5.6 — input layer only)
 - generating natural day-by-day narrative text
 - writing one-sentence recommendation reasons
 - inferring soft preferences from free-text input (optional)
@@ -67,9 +72,10 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | ✅ Complete |
 | Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) · geographic spread constraint · travel-time cap | ✅ Complete |
 | Sprint 5.5 | Preference input enhancement: `preferred_categories` · bilingual soft-preference inference (中/EN) | ✅ Complete |
+| Sprint 5.6 | LLM-based natural language input parsing · `POST /api/v1/trips/plan-from-text` · `NLInputParser` service · 36 new tests | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 5.5)
+### What works right now (Sprint 5.6)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -82,7 +88,18 @@ uvicorn main:app --reload
 curl http://localhost:8000/api/v1/health
 ```
 
-**Plan a trip (simplified input — recommended):**
+**Plan a trip from a natural language description (new in Sprint 5.6):**
+```bash
+curl -X POST http://localhost:8000/api/v1/trips/plan-from-text \
+  -H "Content-Type: application/json" \
+  -d '{
+    "raw_text": "I'\''d like to spend three days in Brisbane, focusing mainly on food."
+  }'
+```
+
+The LLM extracts destination, duration, and categories from the sentence, then the existing four-stage pipeline plans the itinerary. The response format is identical to `/trips/plan`.
+
+**Plan a trip (structured input — still the primary interface):**
 ```bash
 curl -X POST http://localhost:8000/api/v1/trips/plan \
   -H "Content-Type: application/json" \
@@ -133,6 +150,7 @@ The first version implements:
 - Weather forecast integration (mock)
 - LLM itinerary text generation (mock provider by default)
 - Single API endpoint: `POST /api/v1/trips/plan`
+- Natural language input endpoint: `POST /api/v1/trips/plan-from-text` (Sprint 5.6)
 - Health check endpoint: `GET /api/v1/health`
 
 Not included in MVP:
@@ -185,7 +203,7 @@ intelligent-trip-planner/
 │   ├── api/
 │   │   ├── router.py                # Aggregates all route groups
 │   │   └── v1/
-│   │       ├── trips.py             # POST /api/v1/trips/plan
+│   │       ├── trips.py             # POST /api/v1/trips/plan  +  /plan-from-text (Sprint 5.6)
 │   │       └── health.py            # GET  /api/v1/health
 │   │
 │   ├── schemas/
@@ -193,7 +211,8 @@ intelligent-trip-planner/
 │   │   ├── trip_request.py          # TripRequest, InterestWeights, TripConstraints
 │   │   ├── persona.py               # TravelerPersona
 │   │   ├── poi.py                   # POI, ScoredPOI, ScheduledPOI, ScoreBreakdown
-│   │   └── itinerary.py             # DayPlan, ItineraryResponse
+│   │   ├── itinerary.py             # DayPlan, ItineraryResponse
+│   │   └── nl_request.py            # NaturalLanguageTripRequest, ParsedTripInput (Sprint 5.6)
 │   │
 │   ├── core/
 │   │   ├── persona_builder.py       # Builds TravelerPersona from TripRequest
@@ -203,7 +222,8 @@ intelligent-trip-planner/
 │   │
 │   ├── services/
 │   │   ├── trip_planner.py          # Orchestrates the full planning pipeline
-│   │   └── itinerary_builder.py     # Assembles final ItineraryResponse
+│   │   ├── itinerary_builder.py     # Assembles final ItineraryResponse
+│   │   └── nl_input_parser.py       # NL text → ParsedTripInput → TripRequest (Sprint 5.6)
 │   │
 │   ├── integrations/
 │   │   ├── poi/
@@ -224,11 +244,11 @@ intelligent-trip-planner/
 │   │       └── weather_factory.py
 │   │
 │   ├── llm/
-│   │   ├── base.py                  # BaseLLMProvider ABC
-│   │   ├── mock_provider.py         # Template-based text, no API key needed
-│   │   ├── openai_provider.py       # OpenAI integration
-│   │   ├── claude_provider.py       # Anthropic Claude integration
-│   │   ├── prompt_templates.py      # All prompt strings
+│   │   ├── base.py                  # BaseLLMProvider ABC (+ parse_natural_language_request)
+│   │   ├── mock_provider.py         # Template-based text + regex NL parsing, no API key needed
+│   │   ├── openai_provider.py       # OpenAI integration (JSON mode for NL parsing)
+│   │   ├── claude_provider.py       # Anthropic Claude integration (fence-stripped JSON)
+│   │   ├── prompt_templates.py      # All prompt strings (+ build_parse_trip_prompt)
 │   │   └── llm_factory.py           # Selects provider from settings
 │   │
 │   ├── data/
@@ -245,6 +265,7 @@ intelligent-trip-planner/
     ├── test_persona_builder.py
     ├── test_poi_scorer.py
     ├── test_day_allocator.py
+    ├── test_nl_input_parser.py      # Sprint 5.6: 36 NL parser tests
     ├── test_integrations/
     └── fixtures/
         └── sample_request.json

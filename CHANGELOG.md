@@ -5,6 +5,100 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Sprint 5.6] — 2026-03-18
+
+### Added
+
+**Natural language input parsing layer**
+
+- `app/schemas/nl_request.py` — Two new schemas:
+  - `NaturalLanguageTripRequest`: API input body with a single `raw_text` field
+    (10–1000 characters). This is what the new endpoint accepts.
+  - `ParsedTripInput`: Intermediate structure populated by the LLM. All eight
+    fields (`destination`, `duration_days`, `start_date`, `end_date`,
+    `budget_level`, `travel_pace`, `preferred_categories`,
+    `free_text_preferences`) are `Optional`; missing values are filled by the
+    service layer, not here.
+
+- `app/llm/prompt_templates.py` — New function `build_parse_trip_prompt(raw_text)`.
+  Instructs the LLM to return **only** a valid JSON object with the exact keys
+  matching `ParsedTripInput`. Includes inline enum value lists, category keyword
+  mapping hints, and an explicit "no prose, no markdown" rule to maximise
+  structural reliability across providers.
+
+- `app/llm/base.py` — New abstract method `parse_natural_language_request(raw_text) → dict`
+  added to `BaseLLMProvider`. Contract: all keys present, unextracted values
+  are `None`, method never raises.
+
+- `app/llm/mock_provider.py` — Concrete implementation of
+  `parse_natural_language_request` using regex and keyword tables.
+  - English: destination extracted from capitalized word(s) after "in"/"to";
+    stops at the first lowercase word or punctuation.
+  - Duration: digit numbers and English word numbers (one–ten) matched;
+    Chinese "X天" pattern also supported.
+  - ISO date pairs (`YYYY-MM-DD`) extracted for duration computation.
+  - Budget, pace, categories, and soft preferences each have separate
+    English and Chinese keyword tables.
+
+- `app/llm/openai_provider.py` — Concrete implementation using
+  `response_format={"type": "json_object"}` and `temperature=0.0` for
+  deterministic structured output. Falls back to `MockLLMProvider` on any error.
+
+- `app/llm/claude_provider.py` — Concrete implementation; strips markdown code
+  fences that Claude occasionally adds around JSON before parsing. Falls back
+  to `MockLLMProvider` on any error.
+
+- `app/services/nl_input_parser.py` — `NLInputParser` service class.
+  Four-step parse pipeline:
+  1. Call `llm.parse_natural_language_request(raw_text)` → raw dict
+  2. Validate dict into `ParsedTripInput` via Pydantic (raises `HTTP 422` on
+     invalid enum values or structure errors)
+  3. Require `destination` (only mandatory field; raises `HTTP 422` if absent)
+  4. Apply defaults and map to `TripRequest`:
+     - `duration_days`: explicit → compute from dates → default `3`
+     - `budget_level`: default `mid_range`
+     - `travel_pace`: default `moderate`
+     - `interests`: always `InterestWeights()` defaults (overridden by
+       `PersonaBuilder` when `preferred_categories` is set)
+     - `constraints`: always `TripConstraints()` all-False defaults
+
+- `app/api/v1/trips.py` — New endpoint `POST /api/v1/trips/plan-from-text`.
+  Accepts `NaturalLanguageTripRequest`, delegates to `NLInputParser.parse()`,
+  then calls the existing `TripPlanner.plan()` with the resulting `TripRequest`.
+  A module-level `_nl_parser` singleton is created alongside the existing
+  `_planner` singleton. The existing `POST /trips/plan` endpoint is untouched.
+
+- `tests/test_nl_input_parser.py` — 36 new unit tests in four classes:
+  - `TestHappyPath` (8): destination lowercased, explicit duration, date-derived
+    duration, budget/pace/categories/free_text passed through, correct return type.
+  - `TestDefaults` (10): each missing field gets its correct default; date range
+    out of bounds falls back to 3; explicit duration wins over date range.
+  - `TestErrorHandling` (7): missing destination → 422, empty destination → 422,
+    invalid enum values → 422, LLM exception → 422, malformed date → default 3.
+  - `TestMockProviderIntegration` (11): end-to-end through real `MockLLMProvider`
+    regex engine; covers food/history/luxury/budget/relaxed/intensive keywords,
+    ISO date pairs, word-number and digit durations, no-destination 422.
+
+### Design decisions
+
+- **Two-schema separation.** `NaturalLanguageTripRequest` (raw text only) and
+  `ParsedTripInput` (LLM output, all optional) are deliberately kept apart.
+  `TripRequest` is never modified. The parser is the only bridge between them.
+- **LLM responsibility is strictly bounded.** The LLM extracts fields; it does
+  not choose POIs, allocate days, order routes, or write the final itinerary.
+  All planning logic remains in the four-stage structured pipeline.
+- **Safe defaults in the service layer, not in the schema.** `ParsedTripInput`
+  fields are all `Optional` with no defaults; defaults live in `NLInputParser`.
+  This makes the boundary explicit and testable.
+- **Backward compatibility preserved.** `POST /trips/plan` and all existing
+  schemas are untouched. Clients using structured input are unaffected.
+- **Mock provider supports Chinese (lightweight).** Destination, duration,
+  budget, pace, categories, and soft preferences each have Chinese keyword
+  tables. For a thesis prototype this is sufficient; real LLM providers handle
+  Chinese natively.
+
+---
+
 ## [Sprint 5.5] — 2026-03-18
 
 ### Added
