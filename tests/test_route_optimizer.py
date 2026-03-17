@@ -90,3 +90,17 @@ class TestInterleave:
         result = _interleave_meals(sights, meals)
         actual_sights = [s for s in result if s.poi.category != POICategory.food_dining]
         assert len(actual_sights) == 3
+
+    def test_three_sights_meal_placed_after_second_sight(self):
+        # With 3 sights mid = max(2, 3//2) = 2 → meal after sight[1]
+        sights = [_sight(i) for i in range(3)]
+        result = _interleave_meals(sights, [_meal(0)])
+        ids = [s.poi.id for s in result]
+        assert ids == ["sight0", "sight1", "meal0", "sight2"]
+
+    def test_two_sights_meal_placed_after_first_sight(self):
+        # With 2 sights mid = max(1, 2//2) = 1 → meal after sight[0]
+        sights = [_sight(i) for i in range(2)]
+        result = _interleave_meals(sights, [_meal(0)])
+        ids = [s.poi.id for s in result]
+        assert ids == ["sight0", "meal0", "sight1"]

@@ -5,6 +5,80 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Quality refinement: cost realism, budget consistency, diversity guarantee, meal timing] — 2026-03-18
+
+### Changed
+
+**`app/integrations/poi/google_places.py` — category-appropriate cost defaults (priority 2)**
+
+- Added `_CATEGORY_DEFAULT_COST_CNY` dict with per-category fallback costs
+  (food_dining ¥120, shopping ¥200, entertainment ¥150, art_museum ¥80,
+  nature_scenery ¥20, history_culture ¥100, local_life ¥60).
+- `_place_to_poi()` now checks whether `price_level` is present in the API
+  response. When it is absent (common for parks, markets, and lesser-known
+  venues), the category-appropriate default is used instead of always
+  defaulting to `price_level=1` (¥50). This prevents every uncategorised
+  venue from showing an identical ¥50 placeholder and makes cost estimates
+  more credible across different venue types.
+
+**`app/core/poi_scorer.py` — stronger budget consistency (priority 3)**
+
+- `_budget_fit_score()` base scores revised: `{0: 1.0, 1: 0.5, 2: 0.0}`.
+  A two-tier gap (e.g. budget user + luxury POI) now gives a hard zero,
+  preventing badly mismatched POIs from sneaking in via popularity.
+- Penalty coefficient raised from 0.3 to 0.4.
+- Net effect for a `mid_range` traveller seeing a luxury POI (gap=1,
+  sensitivity=0.5): budget_score drops from 0.45 → 0.30, making the budget
+  component a more meaningful discriminator.
+
+**`app/core/day_allocator.py` — non-food diversity guarantee (priority 4)**
+
+- Added `_MIN_NON_FOOD_PER_DAY = 1` constant.
+- When the greedy loop is filling the last available slot and no non-food
+  POI has been placed yet, food_dining candidates are skipped so at least
+  one non-food venue can claim the slot. If no non-food candidate fits
+  within the time/spread budget, the guard is lifted and food fills the
+  slot normally (no crash, no empty day).
+
+**`app/core/route_optimizer.py` — earlier lunch anchor (priority 5)**
+
+- `_interleave_meals()`: when there are ≥ 3 sights, `mid` is now
+  `max(2, len(sights) // 2)` instead of `max(1, …)`. This ensures the
+  first meal is placed after at least two sights, shifting "lunch" from
+  ~10:30 (after one 1.5h sight) to ~12:00–13:00 (after two sights).
+  With 1–2 sights the original behaviour is preserved to avoid pushing
+  the meal past all sights.
+
+**`app/services/itinerary_builder.py` — mixed-category day themes (priority 1, previous session)**
+
+- `_day_theme()` now returns a blended label (e.g. `"Food & Dining · Local Life"`)
+  when the runner-up category count is ≥ half of the dominant count,
+  accurately reflecting multi-interest days in the UI and LLM prompts.
+
+**`app/llm/prompt_templates.py` — deduplicated overview themes (priority 1, previous session)**
+
+- `build_overview_prompt()` deduplicates `day_themes` before joining so the
+  LLM receives `"Food & Dining · Local Life"` instead of
+  `"Food & Dining, Food & Dining, Food & Dining"`, eliminating the
+  "Shopping and Shopping" / "Food & Dining and Food & Dining" overview bug.
+
+### Tests added
+
+- `tests/test_itinerary_builder.py` (new) — 8 cases: `_day_theme` blended/plain/
+  edge cases; overview prompt deduplication and fallback.
+- `tests/test_poi_scorer.py` — 4 new cases in `TestBudgetConsistency`:
+  two-tier gap → zero; one-tier gap < 0.5; matching tier → 1.0;
+  non-negative for all tier combinations.
+- `tests/test_day_allocator.py` — 2 new cases in `TestDiversityGuarantee`:
+  at least 1 non-food per day when available; all-food pool still produces
+  a non-empty day.
+- `tests/test_route_optimizer.py` — 2 new cases: 3-sights meal placed after
+  second sight; 2-sights meal placed after first sight.
+
+Total: 125 tests passing.
+
+---
+
 ## [Scheduling refinement: food cap + meal slot distribution] — 2026-03-18
 
 ### Changed

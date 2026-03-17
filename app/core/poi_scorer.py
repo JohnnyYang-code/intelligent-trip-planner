@@ -113,20 +113,23 @@ class POIScorer:
         Measures how well the POI's price tier matches the traveller's budget.
 
         Same tier:      base = 1.0
-        One tier apart: base = 0.6
-        Two tiers apart: base = 0.2
+        One tier apart: base = 0.5
+        Two tiers apart: base = 0.0  (hard zero — two-tier mismatch is a
+                                       strong signal of incompatibility)
 
-        The base is then reduced by (sensitivity × gap × 0.3) to further
-        penalise out-of-range pricing for budget-sensitive travellers.
+        The base is then further reduced by (sensitivity × gap × 0.4).
+        A mid_range traveller seeing a luxury POI (gap=1, sensitivity=0.5)
+        gets a budget_score of 0.30 instead of the old 0.45, making the
+        budget component a more meaningful discriminator.
         """
         poi_tier_rank = _BUDGET_ORDER[poi.budget_tier]
         traveler_tier_rank = _BUDGET_ORDER[persona.budget_level]
         gap = abs(poi_tier_rank - traveler_tier_rank)
 
-        base_map = {0: 1.0, 1: 0.6, 2: 0.2}
+        base_map = {0: 1.0, 1: 0.5, 2: 0.0}
         base = base_map[gap]
 
-        penalty = persona.budget_sensitivity * gap * 0.3
+        penalty = persona.budget_sensitivity * gap * 0.4
         score = base - penalty
         return max(0.0, min(1.0, score))
 

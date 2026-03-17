@@ -163,7 +163,13 @@ def _interleave_meals(
     if not sights:
         return list(meals)
 
-    mid = max(1, len(sights) // 2)
+    # With ≥ 3 sights, require at least 2 before the first meal so that
+    # "lunch" falls around 12:00–13:00 rather than ~10:30.
+    # With 1–2 sights keep mid=1 to avoid pushing the meal past all sights.
+    if len(sights) >= 3:
+        mid = max(2, len(sights) // 2)
+    else:
+        mid = max(1, len(sights) // 2)
     before = sights[:mid]
     after  = sights[mid:]
 

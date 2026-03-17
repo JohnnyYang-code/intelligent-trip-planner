@@ -232,3 +232,38 @@ class TestScoreAll:
         results = scorer.score_all([poi_blocked, poi_normal], persona)
         assert results[-1].poi.id == "blocked"
         assert results[-1].total_score == 0.0
+
+
+# ── Budget consistency ────────────────────────────────────────────────────────
+
+class TestBudgetConsistency:
+    def test_two_tier_gap_gives_zero_budget_score(self, scorer, builder):
+        # budget user (sensitivity=0.9) + luxury POI (gap=2) → base=0.0
+        luxury_poi = _make_poi(id="luxury", budget_tier=BudgetLevel.luxury)
+        persona = _make_persona(builder, budget_level=BudgetLevel.budget)
+        result = scorer.score_one(luxury_poi, persona)
+        assert result.score_breakdown.budget_score == 0.0
+
+    def test_one_tier_gap_score_below_half(self, scorer, builder):
+        # mid_range user (sensitivity=0.5) + luxury POI (gap=1)
+        # new: base=0.5 − 0.5×0.4 = 0.30 (below 0.5)
+        luxury_poi = _make_poi(id="luxury", budget_tier=BudgetLevel.luxury)
+        persona = _make_persona(builder, budget_level=BudgetLevel.mid_range)
+        result = scorer.score_one(luxury_poi, persona)
+        assert result.score_breakdown.budget_score < 0.5
+
+    def test_matching_tier_gives_max_budget_score(self, scorer, builder):
+        mid_poi = _make_poi(id="mid", budget_tier=BudgetLevel.mid_range)
+        persona = _make_persona(builder, budget_level=BudgetLevel.mid_range)
+        result = scorer.score_one(mid_poi, persona)
+        assert result.score_breakdown.budget_score == 1.0
+
+    def test_budget_score_non_negative_for_all_tier_combinations(
+        self, scorer, builder
+    ):
+        for poi_tier in BudgetLevel:
+            for user_tier in BudgetLevel:
+                poi = _make_poi(id="p", budget_tier=poi_tier)
+                persona = _make_persona(builder, budget_level=user_tier)
+                result = scorer.score_one(poi, persona)
+                assert result.score_breakdown.budget_score >= 0.0

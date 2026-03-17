@@ -127,8 +127,26 @@ class ItineraryBuilder:
 
 
 def _day_theme(day_pois: list[ScheduledPOI]) -> str:
+    """
+    Return a human-readable theme label for a day.
+
+    When a clear secondary category is present (runner-up count ≥ half of
+    dominant), a blended label is returned (e.g. "Food & Dining · Local Life")
+    so multi-interest days are accurately reflected in the UI and LLM prompts.
+    """
     if not day_pois:
         return "Free Day"
     counter = Counter(sp.poi.category for sp in day_pois)
-    dominant: POICategory = counter.most_common(1)[0][0]
-    return _CATEGORY_THEMES.get(dominant, "Mixed")
+    top = counter.most_common(2)
+    dominant: POICategory = top[0][0]
+    dominant_label = _CATEGORY_THEMES.get(dominant, "Mixed")
+
+    if len(top) == 2:
+        runner_up_count = top[1][1]
+        dominant_count  = top[0][1]
+        # Blend when runner-up is significant (≥ half of dominant count).
+        if runner_up_count >= max(1, dominant_count // 2):
+            runner_up_label = _CATEGORY_THEMES.get(top[1][0], "Mixed")
+            return f"{dominant_label} · {runner_up_label}"
+
+    return dominant_label

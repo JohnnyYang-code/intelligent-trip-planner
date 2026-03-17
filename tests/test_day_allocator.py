@@ -229,3 +229,48 @@ class TestFoodCap:
         result = allocator.allocate(scored, persona)
         categories = {sp.poi.category for sp in result[0]}
         assert POICategory.local_life in categories
+
+
+# ── Diversity guarantee ───────────────────────────────────────────────────────
+
+class TestDiversityGuarantee:
+    def test_at_least_one_non_food_per_day_when_available(
+        self, allocator, builder, scorer
+    ):
+        # Many food POIs that would otherwise dominate, plus a few non-food.
+        food_pois = [
+            _make_poi(id=f"f{i}", category=POICategory.food_dining,
+                      duration_hours=1.0, popularity_score=9.0, quality_score=9.0)
+            for i in range(6)
+        ]
+        local_pois = [
+            _make_poi(id=f"l{i}", category=POICategory.local_life,
+                      duration_hours=1.0, popularity_score=5.0, quality_score=5.0)
+            for i in range(3)
+        ]
+        persona = _make_persona(
+            builder,
+            duration_days=1,
+            interests=InterestWeights(food_dining=1.0),
+        )
+        scored = scorer.score_all(food_pois + local_pois, persona)
+        result = allocator.allocate(scored, persona)
+        non_food = [sp for sp in result[0] if sp.poi.category != POICategory.food_dining]
+        assert len(non_food) >= 1
+
+    def test_all_food_day_allowed_when_no_non_food_available(
+        self, allocator, builder, scorer
+    ):
+        # Only food POIs in pool — diversity guard must not crash or drop all.
+        food_pois = [
+            _make_poi(id=f"f{i}", category=POICategory.food_dining, duration_hours=1.0)
+            for i in range(5)
+        ]
+        persona = _make_persona(
+            builder,
+            duration_days=1,
+            interests=InterestWeights(food_dining=1.0),
+        )
+        scored = scorer.score_all(food_pois, persona)
+        result = allocator.allocate(scored, persona)
+        assert len(result[0]) > 0  # day is not empty

@@ -75,6 +75,19 @@ _PRICE_LEVEL_BUDGET = {
     4: BudgetLevel.luxury,
 }
 
+# Fallback avg cost (CNY) used when Google Places omits price_level entirely.
+# Category-appropriate defaults prevent every uncategorised venue from
+# showing the same ¥50 placeholder (price_level=1 default).
+_CATEGORY_DEFAULT_COST_CNY: dict[POICategory, float] = {
+    POICategory.food_dining:     120.0,   # casual sit-down meal
+    POICategory.shopping:        200.0,   # typical retail spend
+    POICategory.entertainment:   150.0,   # ticket / activity fee
+    POICategory.art_museum:       80.0,   # museum / gallery entry
+    POICategory.nature_scenery:   20.0,   # park entry (often free or minimal)
+    POICategory.history_culture: 100.0,   # heritage site entry
+    POICategory.local_life:       60.0,   # local market / café
+}
+
 # Typical visit durations per category (hours).
 _CATEGORY_DURATION: dict[POICategory, float] = {
     POICategory.history_culture: 2.0,
@@ -211,10 +224,16 @@ def _place_to_poi(
     ratings_count: int = place.get("user_ratings_total", 0)
     popularity_score = min(10.0, math.log1p(ratings_count) / math.log1p(10_000) * 10.0)
 
-    # Budget.
-    price_level: int = place.get("price_level", 1)
-    budget_tier = _PRICE_LEVEL_BUDGET.get(price_level, BudgetLevel.mid_range)
-    avg_cost_cny = float(_PRICE_LEVEL_CNY.get(price_level, 150))
+    # Budget — use API price_level when present; fall back to a
+    # category-appropriate default so costs are not uniformly ¥50.
+    price_level_raw = place.get("price_level")
+    if price_level_raw is not None:
+        price_level = int(price_level_raw)
+        budget_tier  = _PRICE_LEVEL_BUDGET.get(price_level, BudgetLevel.mid_range)
+        avg_cost_cny = float(_PRICE_LEVEL_CNY.get(price_level, 150))
+    else:
+        avg_cost_cny = _CATEGORY_DEFAULT_COST_CNY.get(detected_category, 100.0)
+        budget_tier  = BudgetLevel.mid_range
 
     # Indoor flag.
     is_indoor = bool(set(place_types) & _INDOOR_TYPES)

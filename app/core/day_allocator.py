@@ -41,6 +41,11 @@ _MAX_INTRA_DAY_SPREAD_KM: float = 40.0
 # filling every slot when the user prefers food, leaving room for other categories.
 _MAX_FOOD_PER_DAY: int = 3
 
+# When filling the last available slot for a day, if no non-food POI has been
+# placed yet, skip food candidates so at least one non-food venue appears
+# (provided a suitable non-food candidate exists in the pool).
+_MIN_NON_FOOD_PER_DAY: int = 1
+
 
 class DayAllocator:
     """
@@ -161,6 +166,19 @@ class DayAllocator:
                     )
                     if food_count >= _MAX_FOOD_PER_DAY:
                         continue
+
+                # Diversity guarantee: when filling the last slot and no
+                # non-food POI has been placed yet, skip food candidates so
+                # at least one non-food venue can claim the slot.
+                non_food_count = sum(
+                    1 for s in selected
+                    if s.poi.category != POICategory.food_dining
+                )
+                last_slot = len(selected) >= max_pois - _MIN_NON_FOOD_PER_DAY
+                if (last_slot
+                        and non_food_count < _MIN_NON_FOOD_PER_DAY
+                        and candidate.poi.category == POICategory.food_dining):
+                    continue
 
                 chosen = candidate
                 break

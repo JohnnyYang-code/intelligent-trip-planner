@@ -17,7 +17,11 @@ def build_overview_prompt(
     day_themes: list[str],
     weather_summary: str,
 ) -> str:
-    themes_str = ", ".join(day_themes) if day_themes else "mixed activities"
+    # Deduplicate while preserving order so repeated identical themes
+    # (e.g. three days all labelled "Food & Dining") don't mislead the LLM.
+    seen: set[str] = set()
+    unique_themes = [t for t in day_themes if not (t in seen or seen.add(t))]  # type: ignore[func-returns-value]
+    themes_str = ", ".join(unique_themes) if unique_themes else "mixed activities"
     return (
         f"You are a helpful travel writer. Write a warm, engaging 2-3 sentence "
         f"introduction for a {duration_days}-day trip to {destination}.\n\n"
