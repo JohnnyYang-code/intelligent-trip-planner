@@ -73,9 +73,10 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) · geographic spread constraint · travel-time cap | ✅ Complete |
 | Sprint 5.5 | Preference input enhancement: `preferred_categories` · bilingual soft-preference inference (中/EN) | ✅ Complete |
 | Sprint 5.6 | LLM-based natural language input parsing · `POST /api/v1/trips/plan-from-text` · `NLInputParser` service · 36 new tests | ✅ Complete |
+| Hotfix | `_TYPE_MAP` reorder in `google_places.py` — specific venue types now win over `tourist_attraction` · 8 regression tests | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 5.6)
+### What works right now (Sprint 5.6 + Hotfix)
 
 The server is fully runnable. Start it and use any HTTP client:
 

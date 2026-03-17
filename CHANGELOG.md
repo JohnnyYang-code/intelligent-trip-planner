@@ -5,6 +5,40 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Hotfix: Google Places category mislabelling] — 2026-03-18
+
+### Fixed
+
+**`_TYPE_MAP` priority order in `app/integrations/poi/google_places.py`**
+
+- Root cause: `tourist_attraction` was listed at index 2 in `_TYPE_MAP`, before
+  `restaurant` (~index 8) and `park` (~index 5). Google Places returns
+  `tourist_attraction` in the `types` array of many venues alongside their primary
+  type (e.g. `["restaurant", "tourist_attraction", "establishment"]`). The
+  first-match logic in `_map_category()` therefore labelled these venues as
+  `history_culture` instead of `food_dining` or `nature_scenery`.
+
+  Consequence: when a user selected `preferred_categories = ["food_dining",
+  "local_life"]`, the mislabelled restaurants and parks received a near-zero
+  interest score (history_culture weight ≈ 0.04 vs. food weight ≈ 0.40). Only
+  shopping POIs — correctly labelled — competed effectively, causing them to
+  dominate allocated days and the LLM overview text.
+
+- Fix: reordered `_TYPE_MAP` so all specific venue types (`restaurant`, `cafe`,
+  `bar`, `food`, `bakery`, `meal_takeaway`, `meal_delivery`, `park`,
+  `natural_feature`, `campground`, `shopping_mall`, `store`, `clothing_store`,
+  and all entertainment/local-life types) appear before the generic fallbacks
+  (`tourist_attraction`, `place_of_worship`, `cemetery`). The `_map_category()`
+  function itself is unchanged.
+
+- Added `tests/test_integrations/test_google_places_category_map.py` — 8
+  regression tests confirming that types lists combining a specific type with
+  `tourist_attraction` resolve to the specific category (e.g.
+  `["restaurant", "tourist_attraction"]` → `food_dining`,
+  `["park", "tourist_attraction"]` → `nature_scenery`).
+
+---
+
 ## [Sprint 5.6] — 2026-03-18
 
 ### Added

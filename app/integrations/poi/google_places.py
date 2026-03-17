@@ -23,24 +23,31 @@ from app.schemas.poi import POI
 logger = logging.getLogger(__name__)
 
 # Map Google Places types → internal POICategory (first match wins).
+# Order: specific venue types first, generic fallbacks (tourist_attraction) last.
+# Many real venues carry tourist_attraction alongside their primary type (e.g.
+# restaurant + tourist_attraction). Placing specific types first ensures they
+# win the first-match and are scored against the correct interest weight.
 _TYPE_MAP: list[tuple[str, POICategory]] = [
+    # Art & Museum
     ("museum",                  POICategory.art_museum),
     ("art_gallery",             POICategory.art_museum),
-    ("tourist_attraction",      POICategory.history_culture),
-    ("place_of_worship",        POICategory.history_culture),
-    ("cemetery",                POICategory.history_culture),
-    ("park",                    POICategory.nature_scenery),
-    ("natural_feature",         POICategory.nature_scenery),
-    ("campground",              POICategory.nature_scenery),
+    # Food & Dining — specific types before tourist_attraction
     ("restaurant",              POICategory.food_dining),
     ("cafe",                    POICategory.food_dining),
     ("bar",                     POICategory.food_dining),
     ("food",                    POICategory.food_dining),
     ("bakery",                  POICategory.food_dining),
     ("meal_takeaway",           POICategory.food_dining),
+    ("meal_delivery",           POICategory.food_dining),
+    # Nature & Scenery
+    ("park",                    POICategory.nature_scenery),
+    ("natural_feature",         POICategory.nature_scenery),
+    ("campground",              POICategory.nature_scenery),
+    # Shopping
     ("shopping_mall",           POICategory.shopping),
     ("store",                   POICategory.shopping),
     ("clothing_store",          POICategory.shopping),
+    # Entertainment
     ("amusement_park",          POICategory.entertainment),
     ("bowling_alley",           POICategory.entertainment),
     ("movie_theater",           POICategory.entertainment),
@@ -48,9 +55,14 @@ _TYPE_MAP: list[tuple[str, POICategory]] = [
     ("stadium",                 POICategory.entertainment),
     ("zoo",                     POICategory.entertainment),
     ("aquarium",                POICategory.entertainment),
+    # Local Life
     ("market",                  POICategory.local_life),
     ("library",                 POICategory.local_life),
     ("city_hall",               POICategory.local_life),
+    # History & Culture — generic fallbacks last
+    ("tourist_attraction",      POICategory.history_culture),
+    ("place_of_worship",        POICategory.history_culture),
+    ("cemetery",                POICategory.history_culture),
 ]
 
 # Estimated avg cost in CNY per price_level tier (0=free, 4=very expensive).
