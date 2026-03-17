@@ -5,6 +5,78 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Sprint 5] — 2026-03-18
+
+### Fixed
+
+**Time overflow bug (Great Wall showing 03:27)**
+
+- `app/core/route_optimizer.py` — Added `_MAX_TRAVEL_HOURS_FALLBACK = 1.5`.
+  `_travel_hours()` now caps Haversine-estimated travel time at 1.5 h per leg,
+  preventing distant POIs (e.g. Great Wall, 57 km from city centre) from
+  overflowing the day's schedule past midnight.
+- `app/core/route_optimizer.py` — `RouteOptimizer.__init__` now accepts an
+  optional `maps_provider: BaseMapsProvider`. When a real provider is injected,
+  actual driving time is used instead of the Haversine fallback.
+
+**Geographic spread constraint in day allocator**
+
+- `app/core/day_allocator.py` — Added `_MAX_INTRA_DAY_SPREAD_KM = 40.0`.
+  `_fill_day()` now ranks candidates by effective score and skips any POI whose
+  straight-line distance to an already-selected day POI exceeds 40 km.
+  `_exceeds_spread()` helper performs the check using `haversine_km`.
+  Effect: attractions more than 40 km apart (e.g. Forbidden City vs Great Wall)
+  are automatically placed on separate days.
+
+### Added
+
+**Real external API providers**
+
+- `app/integrations/weather/openweathermap.py` — `OpenWeatherMapProvider`.
+  Calls the free OWM 5-day/3-hour forecast endpoint via `httpx`. Picks the
+  12:00 slot per day as the daily representative. Maps OWM `weather[0].main`
+  codes (Clear, Rain, Snow, …) to internal condition strings. Repeats the last
+  available day when the API range is shorter than the trip duration.
+
+- `app/integrations/maps/google_maps.py` — `GoogleMapsProvider`.
+  Wraps the `googlemaps` SDK. `get_distance()` calls Distance Matrix API
+  (driving mode); `geocode()` calls Geocoding API. Lazy SDK import — safe if
+  `googlemaps` package is absent.
+
+- `app/integrations/maps/amap.py` — `AmapProvider`.
+  Uses `httpx` to call the Amap Web Service driving route and geocoding APIs.
+  Includes `wgs84_to_gcj02()` pure function for coordinate conversion (WGS-84
+  mock POI data → GCJ-02 required by Amap). All API calls are async.
+
+- `app/integrations/poi/google_places.py` — `GooglePlacesPOIProvider`.
+  Geocodes the destination, then runs one Nearby Search per `POICategory`
+  using the `googlemaps` SDK. Maps Google Place types → `POICategory`,
+  `price_level` → `BudgetLevel` + `avg_cost_cny`, `rating` → `quality_score`,
+  `user_ratings_total` (log-normalised) → `popularity_score`.
+
+**Service layer update**
+
+- `app/services/trip_planner.py` — `TripPlanner.__init__` now instantiates
+  `self.maps_provider` via `create_maps_provider(settings)` and injects it
+  into `RouteOptimizer(maps_provider=self.maps_provider)`. Health log now
+  also reports the active maps provider.
+
+### Design decisions
+
+- **Two-layer geographic fix.** The 40 km spread constraint prevents distant
+  POIs from landing on the same day; the 1.5 h travel-time cap is a safety
+  net for the remaining Haversine-based time assignment.
+- **`_exceeds_spread` uses Haversine only.** The real Maps provider is not
+  called here — allocation runs synchronously before route optimization, and
+  Haversine is accurate enough for a 40 km threshold check.
+- **Amap `get_distance` is sync.** `BaseMapsProvider.get_distance` is declared
+  synchronous (used in a tight loop inside `RouteOptimizer`). The Amap
+  implementation raises if called from an async event loop; `RouteOptimizer`
+  will fall through to the Haversine cap in that case. A future sprint can
+  make `get_distance` async.
+
+---
+
 ## [Sprint 4] — 2026-03-18
 
 ### Added

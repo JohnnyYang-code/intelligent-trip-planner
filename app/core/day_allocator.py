@@ -16,6 +16,7 @@ import logging
 from collections import Counter
 
 from app.config.settings import get_settings
+from app.integrations.maps.mock_provider import haversine_km
 from app.schemas.itinerary import DailyWeather
 from app.schemas.persona import TravelerPersona
 from app.schemas.poi import ScoredPOI
@@ -29,6 +30,11 @@ _BAD_WEATHER: frozenset[str] = frozenset({"Rainy", "Foggy", "Snowy"})
 _INDOOR_WEATHER_BONUS: float = 1.15    # indoor POI on a bad-weather day
 _OUTDOOR_WEATHER_PENALTY: float = 0.75  # outdoor POI on a bad-weather day
 _DISTRICT_BONUS: float = 1.10           # same district as today's dominant area
+
+# Maximum straight-line distance allowed between any two POIs on the same day.
+# Prevents distant attractions (e.g. Forbidden City and Great Wall, ~57 km)
+# from being placed on the same day and causing time overflow.
+_MAX_INTRA_DAY_SPREAD_KM: float = 40.0
 
 
 class DayAllocator:
@@ -123,18 +129,34 @@ class DayAllocator:
 
             dominant_district = _dominant_district(selected)
 
-            best = max(remaining, key=lambda sp: _effective_score(
-                sp, weather, dominant_district
-            ))
+            # Sort candidates by effective score descending so we can try
+            # them in order and skip those that violate geographic spread.
+            ranked = sorted(
+                remaining,
+                key=lambda sp: _effective_score(sp, weather, dominant_district),
+                reverse=True,
+            )
 
-            # Respect time budget; allow a small (0.5 h) overrun so that
-            # a short final POI is not unfairly excluded.
-            if hours_used + best.poi.duration_hours > hours_budget + 0.5:
+            chosen = None
+            for candidate in ranked:
+                # Respect time budget; allow a small (0.5 h) overrun so that
+                # a short final POI is not unfairly excluded.
+                if hours_used + candidate.poi.duration_hours > hours_budget + 0.5:
+                    break
+
+                # Skip candidate if it is too far from any already-selected POI.
+                if selected and _exceeds_spread(candidate, selected):
+                    continue
+
+                chosen = candidate
                 break
 
-            selected.append(best)
-            hours_used += best.poi.duration_hours
-            remaining = [r for r in remaining if r.poi.id != best.poi.id]
+            if chosen is None:
+                break
+
+            selected.append(chosen)
+            hours_used += chosen.poi.duration_hours
+            remaining = [r for r in remaining if r.poi.id != chosen.poi.id]
 
         return selected, remaining
 
@@ -160,6 +182,18 @@ def _effective_score(
         score *= _DISTRICT_BONUS
 
     return score
+
+
+def _exceeds_spread(candidate: ScoredPOI, selected: list[ScoredPOI]) -> bool:
+    """Return True if candidate is more than _MAX_INTRA_DAY_SPREAD_KM from any selected POI."""
+    for sp in selected:
+        dist = haversine_km(
+            candidate.poi.latitude, candidate.poi.longitude,
+            sp.poi.latitude, sp.poi.longitude,
+        )
+        if dist > _MAX_INTRA_DAY_SPREAD_KM:
+            return True
+    return False
 
 
 def _dominant_district(pois: list[ScoredPOI]) -> str | None:

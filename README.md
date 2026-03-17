@@ -65,10 +65,10 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 2 | `day_allocator` · `route_optimizer` · `itinerary_builder` · `trip_planner` · allocator tests | ✅ Complete |
 | Sprint 3 | API layer (`health.py`, `trips.py`) · full `router.py` · curl end-to-end test | ✅ Complete |
 | Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | ✅ Complete |
-| Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) | Planned |
+| Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) · geographic spread constraint · travel-time cap | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 4)
+### What works right now (Sprint 5)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -97,6 +97,10 @@ curl -X POST http://localhost:8000/api/v1/trips/plan \
 Interactive API docs: `http://localhost:8000/docs`
 
 All response fields are populated. LLM-generated fields (`overview`, `narrative`, `recommendation_reason`) use template text in mock mode and real AI-generated text when an API key is configured.
+
+The planner also enforces two geographic constraints added in Sprint 5:
+- POIs more than 40 km apart are never placed on the same day (e.g. Forbidden City and Great Wall go on different days).
+- Per-leg travel time is capped at 1.5 h when using the Haversine fallback, preventing schedule overflow past midnight.
 
 ---
 
@@ -187,9 +191,22 @@ intelligent-trip-planner/
 │   │   └── itinerary_builder.py     # Assembles final ItineraryResponse
 │   │
 │   ├── integrations/
-│   │   ├── poi/                     # POI data source (mock JSON / Google Places)
-│   │   ├── maps/                    # Distance & routing (mock Haversine / Google Maps / Amap)
-│   │   └── weather/                 # Weather forecast (mock / OpenWeatherMap)
+│   │   ├── poi/
+│   │   │   ├── base.py              # BasePOIProvider ABC
+│   │   │   ├── mock_provider.py     # Reads local JSON files
+│   │   │   ├── google_places.py     # Google Places Nearby Search + Place Details
+│   │   │   └── poi_factory.py
+│   │   ├── maps/
+│   │   │   ├── base.py              # BaseMapsProvider ABC
+│   │   │   ├── mock_provider.py     # Haversine straight-line distance
+│   │   │   ├── google_maps.py       # Google Maps Distance Matrix + Geocoding
+│   │   │   ├── amap.py              # Amap (高德) driving route + WGS84→GCJ02
+│   │   │   └── maps_factory.py
+│   │   └── weather/
+│   │       ├── base.py              # BaseWeatherProvider ABC
+│   │       ├── mock_provider.py     # Seasonal fixed forecast
+│   │       ├── openweathermap.py    # OWM 5-day/3-hour forecast
+│   │       └── weather_factory.py
 │   │
 │   ├── llm/
 │   │   ├── base.py                  # BaseLLMProvider ABC
@@ -326,7 +343,7 @@ If a real provider is configured but fails (e.g., key is invalid), the system lo
 
 The following features are out of scope for the MVP but are supported by the current architecture:
 
-- **Real external API integration** — Google Places, Google Maps / Amap, OpenWeatherMap, OpenAI / Claude
+- ~~**Real external API integration**~~ — Completed in Sprint 5 (Google Places, Google Maps, Amap, OpenWeatherMap, OpenAI, Claude)
 - **Itinerary refinement** — `POST /api/v1/trips/{id}/refine` accepts user feedback and re-generates text
 - **SQLite persistence** — save and retrieve past itineraries via `GET /api/v1/trips/{id}`
 - **PostgreSQL migration** — the SQLAlchemy layer is already abstracted for this

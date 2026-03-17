@@ -22,6 +22,7 @@ from app.core.day_allocator import DayAllocator
 from app.core.persona_builder import PersonaBuilder
 from app.core.poi_scorer import POIScorer
 from app.core.route_optimizer import RouteOptimizer
+from app.integrations.maps.maps_factory import create_maps_provider
 from app.integrations.poi.poi_factory import create_poi_provider
 from app.integrations.weather.weather_factory import create_weather_provider
 from app.llm.llm_factory import create_llm_provider
@@ -42,16 +43,19 @@ class TripPlanner:
         self.persona_builder = PersonaBuilder()
         self.poi_scorer = POIScorer()
         self.day_allocator = DayAllocator()
-        self.route_optimizer = RouteOptimizer()
         self.itinerary_builder = ItineraryBuilder()
 
         self.poi_provider = create_poi_provider(settings)
+        self.maps_provider = create_maps_provider(settings)
         self.weather_provider = create_weather_provider(settings)
         self.llm = create_llm_provider(settings)
 
+        self.route_optimizer = RouteOptimizer(maps_provider=self.maps_provider)
+
         logger.info(
-            "TripPlanner initialised (poi=%s, weather=%s, llm=%s)",
+            "TripPlanner initialised (poi=%s, maps=%s, weather=%s, llm=%s)",
             self.poi_provider.provider_name,
+            self.maps_provider.provider_name,
             self.weather_provider.provider_name,
             self.llm.provider_name,
         )

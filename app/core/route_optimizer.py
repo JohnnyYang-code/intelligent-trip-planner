@@ -15,8 +15,10 @@ Strategy (MVP)
 """
 
 import logging
+from typing import Optional
 
 from app.config.settings import get_settings
+from app.integrations.maps.base import BaseMapsProvider, Coordinates
 from app.integrations.maps.mock_provider import haversine_km
 from app.schemas.common import POICategory
 from app.schemas.itinerary import DailyWeather
@@ -25,19 +27,24 @@ from app.schemas.poi import POI, ScheduledPOI, ScoredPOI
 logger = logging.getLogger(__name__)
 
 _DEFAULT_START_TIME = "09:00"
+# Maximum travel time per leg when using Haversine fallback.
+# Prevents time overflow when two POIs are geographically far apart.
+_MAX_TRAVEL_HOURS_FALLBACK = 1.5
 
 
 class RouteOptimizer:
     """
     Produces an ordered list of ScheduledPOI for a single travel day.
 
-    ``recommendation_reason`` on each ScheduledPOI is left empty; the LLM
-    layer (Sprint 4) fills it in.
+    When a real MapsProvider is injected, travel time is computed from
+    actual driving/transit data.  Without one, Haversine straight-line
+    distance is used with a 1.5-hour cap per leg.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, maps_provider: Optional[BaseMapsProvider] = None) -> None:
         settings = get_settings()
         self._buffer_hours: float = settings.transport_buffer_minutes / 60.0
+        self._maps: Optional[BaseMapsProvider] = maps_provider
 
     def optimize(
         self,
@@ -96,7 +103,7 @@ class RouteOptimizer:
             # Add estimated travel time to the next POI.
             if order < len(sequence):
                 next_poi = sequence[order]   # sequence is 0-based; order is 1-based
-                current_hour += _travel_hours(sp.poi, next_poi.poi)
+                current_hour += _travel_hours(sp.poi, next_poi.poi, self._maps)
 
         logger.debug(
             "RouteOptimizer: ordered %d POIs, day ends ~%s",
@@ -112,7 +119,8 @@ def _nearest_neighbour(pois: list[ScoredPOI]) -> list[ScoredPOI]:
     """
     Greedy nearest-neighbour traversal starting from the first element.
 
-    Returns the input list reordered to minimise total Haversine distance.
+    Uses Haversine straight-line distance for ordering (good enough for
+    sorting; actual travel times are applied during time assignment).
     """
     if len(pois) <= 1:
         return list(pois)
@@ -158,14 +166,34 @@ def _interleave_meals(
     return sequence
 
 
-def _travel_hours(origin: POI, destination: POI) -> float:
-    """Estimate walking travel time in hours between two POIs."""
+def _travel_hours(
+    origin: POI,
+    destination: POI,
+    maps: Optional[BaseMapsProvider] = None,
+) -> float:
+    """
+    Estimate travel time in hours between two POIs.
+
+    If a real MapsProvider is available, uses driving distance from the API.
+    Otherwise falls back to Haversine straight-line distance, capped at
+    _MAX_TRAVEL_HOURS_FALLBACK to prevent time overflow for distant POIs.
+    """
+    if maps is not None and maps.is_available():
+        try:
+            result = maps.get_distance(
+                Coordinates(origin.latitude, origin.longitude),
+                Coordinates(destination.latitude, destination.longitude),
+            )
+            return result.duration_minutes / 60.0
+        except Exception:
+            pass  # fall through to Haversine
+
     dist_km = haversine_km(
         origin.latitude, origin.longitude,
         destination.latitude, destination.longitude,
     )
-    walking_speed_kmh = 4.0
-    return dist_km / walking_speed_kmh
+    estimated = dist_km / 4.0   # walking speed as conservative fallback
+    return min(estimated, _MAX_TRAVEL_HOURS_FALLBACK)
 
 
 def _parse_time(time_str: str) -> float:
