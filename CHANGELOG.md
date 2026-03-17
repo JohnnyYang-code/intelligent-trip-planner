@@ -5,6 +5,41 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Sprint 3] — 2026-03-18
+
+### Added
+
+**API layer**
+
+- `app/api/v1/health.py` — `GET /api/v1/health`.
+  Instantiates all three external providers (POI, Maps, Weather) and
+  returns their `provider_name`, `is_available()` status, and configured
+  mode (`mock` / real) in a structured JSON response.
+  The LLM entry is included as a placeholder (`available: true`) with
+  the mode read from `settings.llm_provider`; full LLM availability
+  checking is added in Sprint 4.
+
+- `app/api/v1/trips.py` — `POST /api/v1/trips/plan`.
+  Accepts a `TripRequest` body, delegates to a module-level `TripPlanner`
+  instance (stateless, safe to reuse across requests), and returns an
+  `ItineraryResponse`. Unhandled exceptions are caught and re-raised as
+  `HTTP 500` with a descriptive message.
+
+**Router update**
+
+- `app/api/router.py` — Replaced the Sprint 1 stub with real route
+  registration. Both `health.router` and `trips.router` are included
+  under the `/v1` prefix, which combines with `main.py`'s `/api` mount
+  to produce the final paths `/api/v1/health` and `/api/v1/trips/plan`.
+
+### No changes to
+
+- `main.py` — Already correctly mounted `api_router` at `/api` from
+  Sprint 1; no modification needed.
+- All core / service / integration modules — untouched.
+
+---
+
 ## [Sprint 2] — 2026-03-16
 
 ### Added
