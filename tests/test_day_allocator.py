@@ -185,3 +185,47 @@ class TestTimeBudget:
             total_h = sum(sp.poi.duration_hours for sp in day)
             # The allocator allows up to budget + 0.5h overrun.
             assert total_h <= 8.5, f"Day exceeds time budget: {total_h}h"
+
+
+# ── Food cap ──────────────────────────────────────────────────────────────────
+
+class TestFoodCap:
+    def test_food_dining_capped_at_three_per_day(self, allocator, builder, scorer):
+        # 10 food POIs with short duration — without the cap all would fill a day.
+        pois = [
+            _make_poi(id=f"f{i}", category=POICategory.food_dining, duration_hours=1.0)
+            for i in range(10)
+        ]
+        persona = _make_persona(
+            builder,
+            duration_days=1,
+            interests=InterestWeights(food_dining=1.0),
+        )
+        scored = scorer.score_all(pois, persona)
+        result = allocator.allocate(scored, persona)
+        food_count = sum(
+            1 for sp in result[0] if sp.poi.category == POICategory.food_dining
+        )
+        assert food_count <= 3
+
+    def test_non_food_fills_remaining_slots_when_food_capped(
+        self, allocator, builder, scorer
+    ):
+        # 5 food + 5 local_life POIs; food should be capped, local_life should appear.
+        food_pois = [
+            _make_poi(id=f"f{i}", category=POICategory.food_dining, duration_hours=1.0)
+            for i in range(5)
+        ]
+        local_pois = [
+            _make_poi(id=f"l{i}", category=POICategory.local_life, duration_hours=1.0)
+            for i in range(5)
+        ]
+        persona = _make_persona(
+            builder,
+            duration_days=1,
+            interests=InterestWeights(food_dining=0.5, local_life=0.5),
+        )
+        scored = scorer.score_all(food_pois + local_pois, persona)
+        result = allocator.allocate(scored, persona)
+        categories = {sp.poi.category for sp in result[0]}
+        assert POICategory.local_life in categories

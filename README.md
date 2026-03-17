@@ -74,9 +74,10 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 5.5 | Preference input enhancement: `preferred_categories` · bilingual soft-preference inference (中/EN) | ✅ Complete |
 | Sprint 5.6 | LLM-based natural language input parsing · `POST /api/v1/trips/plan-from-text` · `NLInputParser` service · 36 new tests | ✅ Complete |
 | Hotfix | `_TYPE_MAP` reorder in `google_places.py` — specific venue types now win over `tourist_attraction` · 8 regression tests | ✅ Complete |
+| Scheduling fix | `day_allocator`: food cap (max 3/day) · `route_optimizer`: breakfast/lunch/dinner slot distribution · 9 new tests | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 5.6 + Hotfix)
+### What works right now (Sprint 5.6 + Hotfixes)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -131,9 +132,11 @@ Interactive API docs: `http://localhost:8000/docs`
 
 All response fields are populated. LLM-generated fields (`overview`, `narrative`, `recommendation_reason`) use template text in mock mode and real AI-generated text when an API key is configured.
 
-The planner also enforces two geographic constraints added in Sprint 5:
+The planner also enforces several scheduling constraints:
 - POIs more than 40 km apart are never placed on the same day (e.g. Forbidden City and Great Wall go on different days).
 - Per-leg travel time is capped at 1.5 h when using the Haversine fallback, preventing schedule overflow past midnight.
+- At most 3 `food_dining` POIs are allocated per day, ensuring other preferred categories (e.g. `local_life`) always have representation.
+- Meal POIs are distributed across breakfast (~09:00), lunch (~12:00), and dinner (~18:00) slots based on count, rather than all stacking at day's end.
 
 ---
 

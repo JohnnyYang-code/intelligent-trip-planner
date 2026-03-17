@@ -5,6 +5,47 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Scheduling refinement: food cap + meal slot distribution] — 2026-03-18
+
+### Changed
+
+**`app/core/day_allocator.py` — per-day food cap**
+
+- Added `_MAX_FOOD_PER_DAY = 3` constant.
+- In `_fill_day()`, added a guard that skips any `food_dining` candidate once
+  three have already been selected for the current day. This prevents
+  restaurant-heavy interest weights from filling every available slot and
+  directly ensures category diversity: the remaining slots are claimed by
+  whichever non-food category ranks next (e.g. `local_life` when the user
+  selects both food and local as preferred categories).
+
+**`app/core/route_optimizer.py` — breakfast / lunch / dinner slot assignment**
+
+- Replaced the `_interleave_meals()` body with slot-aware positioning:
+
+  | Meal count | Positions |
+  |---|---|
+  | 1 | Lunch (midpoint of sights) |
+  | 2 | Lunch (midpoint) + Dinner (end) |
+  | 3 | Breakfast (start) + Lunch (midpoint) + Dinner (end) |
+
+  With a 09:00 day start and typical sight durations of 1.5–2.5 h, this
+  naturally places meals inside realistic windows (breakfast ~09:00, lunch
+  ~12:00, dinner ~18:00) without any explicit time arithmetic. The sequential
+  time-assignment loop in `optimize()` is unchanged.
+
+**Tests**
+
+- `tests/test_day_allocator.py` — 2 new cases in `TestFoodCap`:
+  10 food-only POIs → at most 3 selected per day; mixed food + local input
+  → local_life POIs still appear once the food cap is reached.
+
+- `tests/test_route_optimizer.py` (new file) — 7 cases covering all
+  meal-count branches (`_interleave_meals` with 0 / 1 / 2 / 3 meals),
+  a no-sights edge case, and preservation of both meal and sight counts.
+
+---
+
 ## [Hotfix: Google Places category mislabelling] — 2026-03-18
 
 ### Fixed

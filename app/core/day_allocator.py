@@ -17,6 +17,7 @@ from collections import Counter
 
 from app.config.settings import get_settings
 from app.integrations.maps.mock_provider import haversine_km
+from app.schemas.common import POICategory
 from app.schemas.itinerary import DailyWeather
 from app.schemas.persona import TravelerPersona
 from app.schemas.poi import ScoredPOI
@@ -35,6 +36,10 @@ _DISTRICT_BONUS: float = 1.10           # same district as today's dominant area
 # Prevents distant attractions (e.g. Forbidden City and Great Wall, ~57 km)
 # from being placed on the same day and causing time overflow.
 _MAX_INTRA_DAY_SPREAD_KM: float = 40.0
+
+# Maximum food_dining POIs per day. Prevents restaurant-heavy scoring from
+# filling every slot when the user prefers food, leaving room for other categories.
+_MAX_FOOD_PER_DAY: int = 3
 
 
 class DayAllocator:
@@ -147,6 +152,15 @@ class DayAllocator:
                 # Skip candidate if it is too far from any already-selected POI.
                 if selected and _exceeds_spread(candidate, selected):
                     continue
+
+                # Cap food_dining to _MAX_FOOD_PER_DAY per day.
+                if candidate.poi.category == POICategory.food_dining:
+                    food_count = sum(
+                        1 for s in selected
+                        if s.poi.category == POICategory.food_dining
+                    )
+                    if food_count >= _MAX_FOOD_PER_DAY:
+                        continue
 
                 chosen = candidate
                 break

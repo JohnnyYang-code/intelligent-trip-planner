@@ -148,22 +148,33 @@ def _interleave_meals(
     meals: list[ScoredPOI],
 ) -> list[ScoredPOI]:
     """
-    Insert meal POIs into the sightseeing sequence.
+    Distribute meal POIs across breakfast / lunch / dinner slots.
 
-    The first meal is inserted at the midpoint of the sightseeing list
-    (approximating a lunch break). Any additional meals are appended at
-    the end (approximating dinner).
+    Slot assignment by meal count (day starts at 09:00):
+      1 meal  → lunch only  (midpoint of sights, ~12:00)
+      2 meals → lunch + dinner  (midpoint + end, ~12:00 / ~18:00)
+      3 meals → breakfast + lunch + dinner  (start + midpoint + end)
+
+    With typical sight durations (1.5–2.5 h) and transport buffers, this
+    places meals inside realistic windows without any time arithmetic.
     """
     if not meals:
         return list(sights)
+    if not sights:
+        return list(meals)
 
     mid = max(1, len(sights) // 2)
-    sequence: list[ScoredPOI] = []
-    sequence.extend(sights[:mid])
-    sequence.append(meals[0])        # first meal ≈ lunch
-    sequence.extend(sights[mid:])
-    sequence.extend(meals[1:])       # remaining meals ≈ dinner / extra
-    return sequence
+    before = sights[:mid]
+    after  = sights[mid:]
+
+    if len(meals) == 1:
+        # Lunch only
+        return list(before) + [meals[0]] + list(after)
+    if len(meals) == 2:
+        # Lunch + dinner
+        return list(before) + [meals[0]] + list(after) + [meals[1]]
+    # 3+ meals: breakfast + lunch + dinner (upstream cap keeps this ≤ 3)
+    return [meals[0]] + list(before) + [meals[1]] + list(after) + list(meals[2:])
 
 
 def _travel_hours(
