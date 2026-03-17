@@ -55,6 +55,7 @@ class MockPOIProvider(BasePOIProvider):
             raw = json.load(fh)
 
         pois = [POI(**entry) for entry in raw.get("pois", [])]
+        pois = [p for p in pois if not p.is_accommodation]
         logger.info(
             "MockPOIProvider: loaded %d POIs for '%s'", len(pois[:limit]), destination
         )

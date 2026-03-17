@@ -18,6 +18,13 @@ _CROWD_SENSITIVE_CATEGORIES: frozenset[POICategory] = frozenset({
 })
 _AVOID_CROWDS_MULTIPLIER: float = 0.25   # 75% score reduction
 
+# When the user made an explicit category selection and a POI's category weight
+# falls below this threshold, reduce its score so that popularity and budget
+# channels alone cannot lift it above preferred venues.
+# Mirrors _LOW_INTEREST_THRESHOLD in day_allocator.py.
+_LOW_INTEREST_THRESHOLD: float = 0.08
+_NON_PREFERRED_MULTIPLIER: float = 0.40  # 60% score reduction
+
 # Budget tier ordering used to compute tier gap for scoring.
 _BUDGET_ORDER: dict[BudgetLevel, int] = {
     BudgetLevel.budget:    0,
@@ -182,5 +189,16 @@ class POIScorer:
             and poi.category in _CROWD_SENSITIVE_CATEGORIES
         ):
             multiplier *= _AVOID_CROWDS_MULTIPLIER
+
+        # Soft penalty: non-preferred category.
+        # Only active when the user made an explicit category selection
+        # (preferred_categories is non-empty). Prevents high-popularity but
+        # unselected venues from outscoring preferred ones via the
+        # popularity/budget channels alone.
+        if (
+            persona.preferred_categories
+            and persona.interest_vector.get(poi.category.value, 0.0) < _LOW_INTEREST_THRESHOLD
+        ):
+            multiplier *= _NON_PREFERRED_MULTIPLIER
 
         return multiplier

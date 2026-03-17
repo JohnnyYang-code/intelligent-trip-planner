@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.schemas.common import BudgetLevel, TravelPace
+from app.schemas.common import BudgetLevel, POICategory, TravelPace
 from app.schemas.trip_request import TripConstraints
 
 
@@ -35,6 +35,10 @@ class TravelerPersona(BaseModel):
 
     # ── Hard constraints (passed through from TripRequest) ────────────────────
     constraints: TripConstraints
+
+    # ── Explicit category selection (non-empty when user used preferred_categories) ──
+    # Used by POIScorer to gate the non-preferred category penalty.
+    preferred_categories: list[POICategory] = Field(default_factory=list)
 
     # ── Human-readable summary injected into every LLM prompt ────────────────
     persona_summary: str = ""

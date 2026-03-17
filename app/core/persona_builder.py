@@ -83,6 +83,7 @@ class PersonaBuilder:
             pois_per_day_target=target,
             pois_per_day_max=maximum,
             inferred_soft_preferences=[],  # populated by LLM in Sprint 4
+            preferred_categories=request.preferred_categories or [],
             constraints=request.constraints,
             persona_summary=summary,
         )

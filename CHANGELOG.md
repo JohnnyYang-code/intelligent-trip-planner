@@ -5,6 +5,73 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Backend: POI quality refinement — accommodation filter + non-preferred category penalty] — 2026-03-18
+
+### Problem
+
+Testing the natural-language input flow (`"3 days in Sydney, food and local neighborhoods, relaxed pace"`) revealed three backend quality issues:
+
+1. **Hotels appearing as `local_life` POIs** — The POI schema had no venue sub-type field. Any hotel labeled `category: local_life` would pass through the entire pipeline unfiltered, appearing as a sightseeing destination.
+2. **Shopping entering the itinerary when not preferred** — A popular shopping mall with `popularity=8.6, quality=8.0, budget=mid_range` scored **0.43** even when the user's shopping interest weight was only ~4%: `0.55×(0.04×0.8) + 0.25×0.86 + 0.20×1.0 = 0.43`. The popularity and budget channels could lift it above marginal preferred venues.
+3. **`local_life` semantics too broad** — No sub-type distinction; hotels and neighborhood alleys were indistinguishable to the scorer.
+
+### Changed
+
+**`app/schemas/poi.py` — `is_accommodation` flag**
+
+- Added `is_accommodation: bool = False` to the `POI` model's Classification flags block.
+- Defaults to `False` — fully backward-compatible; all existing JSON entries remain valid without modification.
+
+**`app/integrations/poi/mock_provider.py` — accommodation filter**
+
+- `search_pois()` now filters out any POI with `is_accommodation=True` before returning results.
+- Filtering happens at the provider boundary so no accommodation entry ever enters the scoring pipeline.
+
+**`app/data/mock/beijing_pois.json` — demo hotel entry**
+
+- Added one hotel entry (`bj_hotel_001`, `"is_accommodation": true`) under `local_life` to make the filter testable and demonstrate the mechanism. It does not appear in any planning output.
+
+**`app/schemas/persona.py` — `preferred_categories` field**
+
+- Added `preferred_categories: list[POICategory] = Field(default_factory=list)` to `TravelerPersona`.
+- Non-empty only when the user made an explicit category selection via `preferred_categories` input. Empty for legacy `InterestWeights`-based requests.
+- Required so the scorer can distinguish "user explicitly selected food + local_life" from "user left all sliders at default."
+
+**`app/core/persona_builder.py` — propagate `preferred_categories`**
+
+- `PersonaBuilder.build()` sets `preferred_categories=request.preferred_categories or []` on the returned persona.
+
+**`app/core/poi_scorer.py` — non-preferred category penalty**
+
+- Added `_LOW_INTEREST_THRESHOLD = 0.08` (mirrors the constant in `day_allocator.py`) and `_NON_PREFERRED_MULTIPLIER = 0.40`.
+- `_constraint_multiplier()` applies a 60% score reduction when:
+  - `persona.preferred_categories` is non-empty (user made an explicit selection), **and**
+  - the POI's category weight is below `_LOW_INTEREST_THRESHOLD`.
+- **Effect:** a popular shopping mall drops from 0.43 → `0.43 × 0.40 = 0.17`, reliably below any moderate preferred venue (~0.55). The existing 1/day allocator cap acts as a hard backstop.
+- **Stacking:** when `avoid_crowds` is also active, both multipliers apply: `0.40 × 0.25 = 0.10`.
+- **No regressions:** gated on `preferred_categories` being non-empty; legacy `InterestWeights` requests have `preferred_categories=[]` and are unaffected.
+
+### Fixed
+
+**Pre-existing JSON parse errors in mock data**
+
+- `app/data/mock/shanghai_pois.json` — bare ASCII `"` inside the description of 朱家角古镇 (`素有"上海威尼斯"之称`) broke JSON parsing; replaced with `「上海威尼斯」`.
+- `app/data/mock/chengdu_pois.json` — same issue in the description of 青城山 and one other entry; corrected to `「…」`.
+
+### Tests added
+
+- `tests/test_poi_scorer.py` — `TestNonPreferredCategoryPenalty` (5 cases):
+  non-preferred shopping gets 0.40× multiplier; preferred category multiplier unchanged at 1.0;
+  popular shopping scores below moderate local_life; penalty inactive for legacy `InterestWeights` input;
+  non-preferred + `avoid_crowds` stack to 0.10.
+- `tests/test_mock_provider.py` (new file) — 3 cases:
+  demo hotel excluded from Beijing results; all three cities return zero accommodation POIs;
+  `bj_hotel_001` specifically absent from results.
+
+Total: 141 tests passing.
+
+---
+
 ## [Backend: preference alignment — soft preference hook + low-interest cap] — 2026-03-18
 
 ### Changed

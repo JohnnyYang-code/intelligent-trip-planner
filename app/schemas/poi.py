@@ -36,6 +36,7 @@ class POI(BaseModel):
     indoor: bool = False                    # True → preferred on rainy days
     child_friendly: bool = True
     accessible: bool = True                 # wheelchair accessible
+    is_accommodation: bool = False          # True → hotel/hostel; excluded from itinerary
 
     # ── Descriptive content (used in LLM prompts) ────────────────────────────
     tags: list[str] = Field(default_factory=list)

@@ -58,7 +58,9 @@ Natural Language Input (optional)
 
 - **Dual input modes** — structured form or free-text natural language
 - **Persona-driven scoring** — interests weighted 55%, popularity 25%, budget fit 20%
-- **Soft preference support** — "avoid crowds" → 0.25× multiplier on shopping/entertainment
+- **Explicit preference enforcement** — categories not selected by the user receive a 0.40× score penalty, preventing popular-but-unselected venues (e.g. shopping malls) from outscoring preferred ones via popularity/budget alone
+- **Soft preference support** — "avoid crowds" → 0.25× multiplier on shopping/entertainment; stacks with the preference penalty
+- **Accommodation filtering** — hotels and serviced apartments are excluded at the provider boundary and never appear as itinerary stops
 - **Weather-aware scheduling** — indoor POIs prioritized on rainy days
 - **Geographic clustering** — prevents >40 km same-day travel
 - **Food slot distribution** — breakfast, lunch, and dinner spread across each day
@@ -176,7 +178,7 @@ intelligent-trip-planner/
 │       ├── api.ts
 │       └── types.ts
 │
-└── tests/                         # 133 tests across all core modules
+└── tests/                         # 141 tests across all core modules
 ```
 
 ---

@@ -317,3 +317,66 @@ class TestSoftPreferenceHook:
         persona.inferred_soft_preferences = ["relaxed_pace", "food_focused"]
         result = scorer.score_one(poi, persona)
         assert result.score_breakdown.constraint_multiplier == pytest.approx(1.0)
+
+
+# ── Non-preferred category penalty ────────────────────────────────────────────
+
+class TestNonPreferredCategoryPenalty:
+    def _make_explicit_persona(self, builder, categories):
+        """Build a persona using explicit preferred_categories selection."""
+        return builder.build(TripRequest(
+            destination="beijing",
+            duration_days=3,
+            budget_level=BudgetLevel.mid_range,
+            travel_pace=TravelPace.moderate,
+            preferred_categories=categories,
+        ))
+
+    def test_non_preferred_shopping_gets_reduced_multiplier(self, scorer, builder):
+        poi = _make_poi(category=POICategory.shopping)
+        persona = self._make_explicit_persona(
+            builder, [POICategory.food_dining, POICategory.local_life]
+        )
+        result = scorer.score_one(poi, persona)
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(0.40)
+
+    def test_preferred_category_multiplier_unchanged(self, scorer, builder):
+        poi = _make_poi(category=POICategory.food_dining)
+        persona = self._make_explicit_persona(
+            builder, [POICategory.food_dining, POICategory.local_life]
+        )
+        result = scorer.score_one(poi, persona)
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(1.0)
+
+    def test_non_preferred_shopping_scores_below_preferred_local_life(self, scorer, builder):
+        """Popular shopping POI must score below a moderate local_life POI."""
+        persona = self._make_explicit_persona(
+            builder, [POICategory.food_dining, POICategory.local_life]
+        )
+        shopping = _make_poi(id="shop", category=POICategory.shopping,
+                             popularity_score=8.6, quality_score=8.0)
+        local = _make_poi(id="local", category=POICategory.local_life,
+                          popularity_score=7.5, quality_score=7.5)
+        score_shop = scorer.score_one(shopping, persona).total_score
+        score_local = scorer.score_one(local, persona).total_score
+        assert score_shop < score_local, (
+            f"Shopping ({score_shop:.4f}) should score below local_life ({score_local:.4f})"
+        )
+
+    def test_penalty_inactive_for_legacy_interest_weights_input(self, scorer, builder):
+        """When preferred_categories is not set, no non-preferred penalty fires."""
+        poi = _make_poi(category=POICategory.shopping)
+        persona = _make_persona(builder)   # InterestWeights path, preferred_categories=[]
+        result = scorer.score_one(poi, persona)
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(1.0)
+
+    def test_non_preferred_and_avoid_crowds_stack(self, scorer, builder):
+        """Non-preferred + avoid_crowds multipliers stack multiplicatively."""
+        poi = _make_poi(category=POICategory.shopping)
+        persona = self._make_explicit_persona(
+            builder, [POICategory.food_dining, POICategory.local_life]
+        )
+        persona.inferred_soft_preferences = ["avoid_crowds"]
+        result = scorer.score_one(poi, persona)
+        # 0.40 (non-preferred) × 0.25 (avoid_crowds) = 0.10
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(0.10)

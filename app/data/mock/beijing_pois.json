@@ -264,6 +264,29 @@
       "tags": ["古典音乐", "歌剧", "话剧", "现代建筑"],
       "description": "由法国建筑师保罗·安德鲁设计的蛋形建筑，是北京顶级表演艺术场所。",
       "highlights": ["歌剧院", "音乐厅", "戏剧场", "外观夜景"]
+    },
+    {
+      "id": "bj_hotel_001",
+      "name": "北京王府井大饭店",
+      "name_en": "Beijing Wangfujing Grand Hotel",
+      "destination": "beijing",
+      "category": "local_life",
+      "latitude": 39.9176,
+      "longitude": 116.4072,
+      "district": "东城区",
+      "popularity_score": 8.2,
+      "quality_score": 7.5,
+      "avg_cost_cny": 800.0,
+      "budget_tier": "luxury",
+      "duration_hours": 0.5,
+      "opening_hours": "全天",
+      "indoor": true,
+      "child_friendly": true,
+      "accessible": true,
+      "is_accommodation": true,
+      "tags": ["酒店", "住宿", "王府井", "商务"],
+      "description": "位于王府井商业区的五星级酒店，提供标准商务住宿服务。",
+      "highlights": ["商务设施", "餐厅", "健身中心"]
     }
   ]
 }
