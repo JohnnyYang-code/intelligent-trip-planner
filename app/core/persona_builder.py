@@ -32,6 +32,26 @@ _CATEGORY_LABELS: dict[str, str] = {
 }
 
 
+def _categories_to_weights(categories: list[POICategory]) -> InterestWeights:
+    """
+    Convert a list of preferred categories into InterestWeights.
+
+    Selected categories receive weight 1.0; unselected receive 0.1 as a
+    small baseline so scoring still considers them lightly.  After this
+    function returns, PersonaBuilder passes the result through the normal
+    L1-normalisation step, producing an interest_vector where:
+      - 1 selected  → selected ≈ 63%, each unselected ≈ 6%
+      - 2 selected  → selected ≈ 40%, each unselected ≈ 4%
+      - 7 selected  → all equal ≈ 14%  (no strong preference)
+    """
+    selected = {cat.value for cat in categories}
+    raw = {
+        cat.value: (1.0 if cat.value in selected else 0.1)
+        for cat in POICategory
+    }
+    return InterestWeights(**raw)
+
+
 class PersonaBuilder:
     """
     Converts a TripRequest into a TravelerPersona.
@@ -42,7 +62,11 @@ class PersonaBuilder:
     """
 
     def build(self, request: TripRequest) -> TravelerPersona:
-        interest_vector = self._normalise_interests(request.interests)
+        if request.preferred_categories:
+            effective_interests = _categories_to_weights(request.preferred_categories)
+        else:
+            effective_interests = request.interests
+        interest_vector = self._normalise_interests(effective_interests)
         budget_sensitivity = self._budget_sensitivity(request)
         target, maximum = _PACE_CAPACITY[request.travel_pace]
         summary = self._build_summary(request, interest_vector)

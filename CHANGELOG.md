@@ -5,6 +5,58 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Sprint 5.5] — 2026-03-18
+
+### Added
+
+**Preference input enhancement**
+
+- `app/schemas/trip_request.py` — New optional field `preferred_categories: list[POICategory]`
+  (1–7 items). Fewer selections produce a more focused traveler profile; selecting all 7 is
+  equivalent to "no strong preference". When provided, this field takes priority over the
+  legacy `interests: InterestWeights` field (which is fully preserved for backward
+  compatibility).
+
+- `app/core/persona_builder.py` — New module-level helper `_categories_to_weights()`.
+  Assigns weight `1.0` to selected categories and `0.1` as a small baseline to unselected
+  ones, then feeds the result into the existing `_normalise_interests()` L1 normalisation.
+  Resulting interest_vector weights:
+  - 1 selected ≈ 63% each selected, 6% each unselected
+  - 2 selected ≈ 40% each selected, 4% each unselected
+  - 7 selected ≈ 14% each (uniform — no preference)
+
+**Bilingual soft-preference inference**
+
+- `app/llm/mock_provider.py` — Added `_detect_language(text)`: lightweight language
+  detection based on CJK Unicode character ratio (threshold 15%). Returns `"zh"`,
+  `"en"`, or `"unknown"`. No external library required.
+
+- `app/llm/mock_provider.py` — Refactored `infer_soft_preferences` into two separate
+  helpers `_infer_zh()` and `_infer_en()`, each with 8 parallel preference tags.
+  Chinese keywords cover: 古建筑/历史/文化, 不想排队/少排队, 本地/当地/地道,
+  小吃/美食/餐厅, 自然/公园/户外, 博物馆/艺术/画廊, 轻松/悠闲/不要太赶, 拍照/摄影/打卡.
+  Text of unknown language returns `[]` without forcing a parse.
+
+**Tests**
+
+- `tests/test_persona_builder.py` — 7 new test cases in `TestPreferredCategories`:
+  selected categories dominate unselected, three-category selection, all-7 uniform weights,
+  `preferred_categories` overrides `interests`, fallback to `interests` when omitted,
+  interest vector still sums to 1.0, `_categories_to_weights` raw output check.
+
+### Design decisions
+
+- **No schema changes to `TravelerPersona`.** The new input flows through
+  `_categories_to_weights → _normalise_interests` and produces the same `interest_vector`
+  type as before. All downstream stages (scorer, allocator, route optimizer) are untouched.
+- **`interests` preserved.** Existing API clients that send raw float weights continue to
+  work unchanged. When both `preferred_categories` and `interests` are present,
+  `preferred_categories` wins.
+- **Language detection is rule-based, not ML-based.** Suitable for a thesis prototype;
+  avoids adding any dependency for a simple bilingual use case.
+
+---
+
 ## [Sprint 5] — 2026-03-18
 
 ### Fixed

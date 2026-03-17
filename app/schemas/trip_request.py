@@ -40,11 +40,26 @@ class TripRequest(BaseModel):
 
     interests: InterestWeights = Field(default_factory=InterestWeights)
 
+    # Simplified category-based preference input (Sprint 5.5).
+    # When provided, this takes priority over `interests` and is automatically
+    # converted to an interest vector inside PersonaBuilder.
+    # Fewer selections = more focused profile; more = broader profile.
+    preferred_categories: Optional[list[POICategory]] = Field(
+        default=None,
+        min_length=1,
+        max_length=7,
+        description=(
+            "1–7 favourite POI categories. "
+            "Fewer selections = more focused profile; more selections = broader profile. "
+            "When set, takes priority over interests."
+        ),
+    )
+
     # Free-text field parsed by the LLM (Sprint 4).
     # Ignored by the structured pipeline; stored for future use.
     free_text_preferences: Optional[str] = Field(
         default=None,
-        description="e.g. 'I love ancient architecture but hate crowds'",
+        description="e.g. 'I love ancient architecture but hate crowds' or '我喜欢古建筑'",
     )
 
     constraints: TripConstraints = Field(default_factory=TripConstraints)

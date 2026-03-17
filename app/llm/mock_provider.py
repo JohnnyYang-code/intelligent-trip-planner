@@ -31,6 +31,69 @@ _CATEGORY_DESCRIPTORS: dict[str, str] = {
 }
 
 
+def _detect_language(text: str) -> str:
+    """
+    Lightweight language detection based on Unicode character ratio.
+
+    Returns "zh" if >15% of characters are CJK Unified Ideographs,
+    "en" if the text contains only ASCII-range characters, or "unknown"
+    when neither condition is met confidently.
+    """
+    if not text:
+        return "unknown"
+    chinese_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
+    ratio = chinese_chars / len(text)
+    if ratio > 0.15:
+        return "zh"
+    if all(ord(c) < 128 for c in text):
+        return "en"
+    return "unknown"
+
+
+def _infer_zh(text: str) -> list[str]:
+    """Chinese keyword-based soft-preference inference."""
+    tags: list[str] = []
+    if any(w in text for w in ["古建筑", "历史", "文化", "遗址", "古迹"]):
+        tags.append("ancient_architecture")
+    if any(w in text for w in ["不想排队", "少排队", "不喜欢人多", "人太多"]):
+        tags.append("avoid_crowds")
+    if any(w in text for w in ["本地", "当地", "地道", "传统"]):
+        tags.append("authentic_local_experience")
+    if any(w in text for w in ["小吃", "美食", "餐厅", "美味", "吃饭"]):
+        tags.append("food_focused")
+    if any(w in text for w in ["自然", "公园", "户外", "风景", "爬山"]):
+        tags.append("nature_outdoor")
+    if any(w in text for w in ["博物馆", "艺术", "画廊", "展览"]):
+        tags.append("art_museum_enthusiast")
+    if any(w in text for w in ["轻松", "悠闲", "不要太赶", "放松", "慢慢"]):
+        tags.append("relaxed_pace")
+    if any(w in text for w in ["拍照", "摄影", "打卡"]):
+        tags.append("photography_focused")
+    return tags
+
+
+def _infer_en(text: str) -> list[str]:
+    """English keyword-based soft-preference inference (text must be lowercased)."""
+    tags: list[str] = []
+    if any(w in text for w in ["ancient", "historic", "old", "heritage", "dynasty"]):
+        tags.append("ancient_architecture")
+    if any(w in text for w in ["crowd", "crowded", "busy", "tourist trap"]):
+        tags.append("avoid_crowds")
+    if any(w in text for w in ["local", "authentic", "traditional"]):
+        tags.append("authentic_local_experience")
+    if any(w in text for w in ["food", "eat", "dining", "cuisine", "restaurant"]):
+        tags.append("food_focused")
+    if any(w in text for w in ["nature", "park", "outdoor", "scenery", "mountain"]):
+        tags.append("nature_outdoor")
+    if any(w in text for w in ["museum", "art", "gallery", "exhibition"]):
+        tags.append("art_museum_enthusiast")
+    if any(w in text for w in ["relax", "slow", "leisurely", "peaceful"]):
+        tags.append("relaxed_pace")
+    if any(w in text for w in ["photo", "instagram", "scenic"]):
+        tags.append("photography_focused")
+    return tags
+
+
 class MockLLMProvider(BaseLLMProvider):
     """
     Template-based text generation — no external calls.
@@ -86,30 +149,17 @@ class MockLLMProvider(BaseLLMProvider):
         """
         Lightweight keyword-based inference — no ML required.
 
-        Detects common preference signals and maps them to tags.
+        Detects the input language first (Chinese vs English via Unicode ratio),
+        then applies the matching keyword table.  Returns an empty list when
+        the language cannot be determined confidently.
         A real LLM provider would extract these more accurately.
         """
-        text = free_text.lower()
-        tags: list[str] = []
-
-        if any(w in text for w in ["ancient", "historic", "old", "heritage", "dynasty"]):
-            tags.append("ancient_architecture")
-        if any(w in text for w in ["crowd", "crowded", "busy", "tourist trap"]):
-            tags.append("avoid_crowds")
-        if any(w in text for w in ["local", "authentic", "traditional"]):
-            tags.append("authentic_local_experience")
-        if any(w in text for w in ["food", "eat", "dining", "cuisine", "restaurant"]):
-            tags.append("food_focused")
-        if any(w in text for w in ["nature", "park", "outdoor", "scenery", "mountain"]):
-            tags.append("nature_outdoor")
-        if any(w in text for w in ["museum", "art", "gallery", "exhibition"]):
-            tags.append("art_museum_enthusiast")
-        if any(w in text for w in ["relax", "slow", "leisurely", "peaceful"]):
-            tags.append("relaxed_pace")
-        if any(w in text for w in ["photo", "instagram", "scenic"]):
-            tags.append("photography_focused")
-
-        return tags
+        lang = _detect_language(free_text)
+        if lang == "zh":
+            return _infer_zh(free_text)
+        if lang == "en":
+            return _infer_en(free_text.lower())
+        return []
 
     def is_available(self) -> bool:
         return True

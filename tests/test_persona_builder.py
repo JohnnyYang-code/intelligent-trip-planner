@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.core.persona_builder import PersonaBuilder
+from app.core.persona_builder import PersonaBuilder, _categories_to_weights
 from app.schemas.common import BudgetLevel, POICategory, TravelPace
 from app.schemas.trip_request import InterestWeights, TripConstraints, TripRequest
 
@@ -174,3 +174,71 @@ class TestConstraintsPassthrough:
         persona = builder.build(_make_request(constraints=constraints))
         assert POICategory.shopping in persona.constraints.avoid_categories
         assert persona.constraints.with_elderly is True
+
+
+# ── preferred_categories input ────────────────────────────────────────────────
+
+class TestPreferredCategories:
+    def test_selected_categories_dominate(self, builder):
+        """Selected categories must have significantly higher weight than unselected."""
+        persona = builder.build(_make_request(
+            preferred_categories=[POICategory.history_culture, POICategory.food_dining],
+        ))
+        selected = [
+            persona.interest_vector[POICategory.history_culture.value],
+            persona.interest_vector[POICategory.food_dining.value],
+        ]
+        unselected = [
+            v for k, v in persona.interest_vector.items()
+            if k not in {POICategory.history_culture.value, POICategory.food_dining.value}
+        ]
+        assert min(selected) > max(unselected) * 3
+
+    def test_three_categories_selected(self, builder):
+        """Three selected categories should all rank above unselected ones."""
+        cats = [POICategory.history_culture, POICategory.nature_scenery, POICategory.food_dining]
+        persona = builder.build(_make_request(preferred_categories=cats))
+        selected_weights = [persona.interest_vector[c.value] for c in cats]
+        unselected_weights = [
+            v for k, v in persona.interest_vector.items()
+            if k not in {c.value for c in cats}
+        ]
+        assert min(selected_weights) > max(unselected_weights)
+
+    def test_all_seven_categories_gives_uniform_weights(self, builder):
+        """Selecting all 7 categories should yield equal weights (no preference)."""
+        persona = builder.build(_make_request(preferred_categories=list(POICategory)))
+        values = list(persona.interest_vector.values())
+        assert all(abs(v - values[0]) < 1e-6 for v in values)
+
+    def test_preferred_categories_overrides_interests(self, builder):
+        """When preferred_categories is set, it takes priority over interests."""
+        # interests strongly favour shopping
+        persona = builder.build(_make_request(
+            interests=InterestWeights(shopping=1.0),
+            preferred_categories=[POICategory.history_culture],
+        ))
+        # history_culture should win, not shopping
+        top = max(persona.interest_vector, key=persona.interest_vector.__getitem__)
+        assert top == POICategory.history_culture.value
+
+    def test_no_preferred_categories_falls_back_to_interests(self, builder):
+        """Omitting preferred_categories preserves original interests behaviour."""
+        persona = builder.build(_make_request(
+            interests=InterestWeights(nature_scenery=0.9),
+        ))
+        top = max(persona.interest_vector, key=persona.interest_vector.__getitem__)
+        assert top == POICategory.nature_scenery.value
+
+    def test_interest_vector_still_sums_to_one(self, builder):
+        persona = builder.build(_make_request(
+            preferred_categories=[POICategory.shopping, POICategory.entertainment],
+        ))
+        assert abs(sum(persona.interest_vector.values()) - 1.0) < 1e-6
+
+    def test_categories_to_weights_helper(self):
+        """_categories_to_weights produces correct raw weights before normalisation."""
+        weights = _categories_to_weights([POICategory.art_museum])
+        assert weights.art_museum == 1.0
+        assert weights.history_culture == 0.1
+        assert weights.food_dining == 0.1

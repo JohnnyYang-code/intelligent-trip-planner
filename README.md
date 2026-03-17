@@ -66,9 +66,10 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 3 | API layer (`health.py`, `trips.py`) · full `router.py` · curl end-to-end test | ✅ Complete |
 | Sprint 4 | LLM layer (`base`, mock, OpenAI/Claude providers, prompt templates) · narrative generation | ✅ Complete |
 | Sprint 5 | Real external API implementations (Google Places, Maps, Amap, OpenWeatherMap) · geographic spread constraint · travel-time cap | ✅ Complete |
+| Sprint 5.5 | Preference input enhancement: `preferred_categories` · bilingual soft-preference inference (中/EN) | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 5)
+### What works right now (Sprint 5.5)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -81,7 +82,21 @@ uvicorn main:app --reload
 curl http://localhost:8000/api/v1/health
 ```
 
-**Plan a trip:**
+**Plan a trip (simplified input — recommended):**
+```bash
+curl -X POST http://localhost:8000/api/v1/trips/plan \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination": "beijing",
+    "duration_days": 3,
+    "budget_level": "mid_range",
+    "travel_pace": "moderate",
+    "preferred_categories": ["history_culture", "food_dining"],
+    "free_text_preferences": "我喜欢古建筑和本地小吃，不想排队"
+  }'
+```
+
+**Plan a trip (legacy weight input — still supported):**
 ```bash
 curl -X POST http://localhost:8000/api/v1/trips/plan \
   -H "Content-Type: application/json" \
