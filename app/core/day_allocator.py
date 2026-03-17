@@ -46,6 +46,14 @@ _MAX_FOOD_PER_DAY: int = 3
 # (provided a suitable non-food candidate exists in the pool).
 _MIN_NON_FOOD_PER_DAY: int = 1
 
+# Categories whose interest_vector weight falls below this threshold are
+# considered "not preferred" by the traveller.  Each such category is capped
+# at _MAX_LOW_INTEREST_PER_DAY per day so that high-popularity but unselected
+# venues (e.g. shopping malls when only nature + local_life were chosen) cannot
+# dominate the itinerary through popularity/budget scores alone.
+_LOW_INTEREST_THRESHOLD: float = 0.08
+_MAX_LOW_INTEREST_PER_DAY: int = 1
+
 
 class DayAllocator:
     """
@@ -100,6 +108,7 @@ class DayAllocator:
                 max_pois=persona.pois_per_day_max,
                 hours_budget=self._daily_hours_budget,
                 weather=weather,
+                interest_vector=persona.interest_vector,
             )
             result.append(day_selection)
 
@@ -121,6 +130,7 @@ class DayAllocator:
         max_pois: int,
         hours_budget: float,
         weather: DailyWeather | None,
+        interest_vector: dict[str, float] | None = None,
     ) -> tuple[list[ScoredPOI], list[ScoredPOI]]:
         """
         Select POIs for one day without mutating any ScoredPOI.
@@ -166,6 +176,22 @@ class DayAllocator:
                     )
                     if food_count >= _MAX_FOOD_PER_DAY:
                         continue
+
+                # Cap low-interest categories to _MAX_LOW_INTEREST_PER_DAY.
+                # A category is "low interest" when its normalised weight in
+                # the persona's interest_vector is below _LOW_INTEREST_THRESHOLD
+                # — i.e. the traveller did not select it as a preferred category.
+                if interest_vector is not None:
+                    cat_weight = interest_vector.get(
+                        candidate.poi.category.value, 0.0
+                    )
+                    if cat_weight < _LOW_INTEREST_THRESHOLD:
+                        cat_count = sum(
+                            1 for s in selected
+                            if s.poi.category == candidate.poi.category
+                        )
+                        if cat_count >= _MAX_LOW_INTEREST_PER_DAY:
+                            continue
 
                 # Diversity guarantee: when filling the last slot and no
                 # non-food POI has been placed yet, skip food candidates so

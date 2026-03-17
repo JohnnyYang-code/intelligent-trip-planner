@@ -75,9 +75,12 @@ The project is built in six sprints. Each sprint is self-contained and leaves th
 | Sprint 5.6 | LLM-based natural language input parsing · `POST /api/v1/trips/plan-from-text` · `NLInputParser` service · 36 new tests | ✅ Complete |
 | Hotfix | `_TYPE_MAP` reorder in `google_places.py` — specific venue types now win over `tourist_attraction` · 8 regression tests | ✅ Complete |
 | Scheduling fix | `day_allocator`: food cap (max 3/day) · `route_optimizer`: breakfast/lunch/dinner slot distribution · 9 new tests | ✅ Complete |
+| Quality refinement | Cost realism · budget consistency · diversity guarantee · meal timing · blended day themes | ✅ Complete |
+| Frontend polish | Time blocks (Morning/Afternoon/Evening) · formatted budget tier · contextual hint chips on POI cards | ✅ Complete |
+| Preference alignment | `avoid_crowds` soft pref → 0.25× multiplier on shopping/entertainment · low-interest category cap (≤ 1/day) | ✅ Complete |
 | Sprint 6 | SQLite persistence · `GET /trips/{id}` endpoint | Planned |
 
-### What works right now (Sprint 5.6 + Hotfixes)
+### What works right now (Sprint 5.6 + Hotfixes + Frontend Polish)
 
 The server is fully runnable. Start it and use any HTTP client:
 
@@ -131,6 +134,10 @@ curl -X POST http://localhost:8000/api/v1/trips/plan \
 Interactive API docs: `http://localhost:8000/docs`
 
 All response fields are populated. LLM-generated fields (`overview`, `narrative`, `recommendation_reason`) use template text in mock mode and real AI-generated text when an API key is configured.
+
+The frontend presents itineraries with broad time blocks (Morning / Afternoon / Evening) instead of exact timestamps, formatted budget tier labels, and contextual hint chips derived from existing API fields (meal slot labels, rainy-day indoor picks, local atmosphere, photo-friendly spots).
+
+Preference alignment ensures the final itinerary matches user intent: free-text signals like "less crowded" suppress shopping and entertainment POIs via a 0.25× score multiplier; unselected categories are additionally capped at one appearance per day regardless of their popularity or budget score.
 
 The planner also enforces several scheduling constraints:
 - POIs more than 40 km apart are never placed on the same day (e.g. Forbidden City and Great Wall go on different days).

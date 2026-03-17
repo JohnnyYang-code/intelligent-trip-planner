@@ -267,3 +267,53 @@ class TestBudgetConsistency:
                 persona = _make_persona(builder, budget_level=user_tier)
                 result = scorer.score_one(poi, persona)
                 assert result.score_breakdown.budget_score >= 0.0
+
+
+# ── Soft preference hook ───────────────────────────────────────────────────────
+
+class TestSoftPreferenceHook:
+    def test_avoid_crowds_penalises_shopping_poi(self, scorer, builder):
+        """Shopping POI should score much lower when avoid_crowds is inferred."""
+        poi = _make_poi(category=POICategory.shopping, popularity_score=9.0, quality_score=9.0)
+        persona = _make_persona(builder)
+        persona.inferred_soft_preferences = ["avoid_crowds"]
+        result = scorer.score_one(poi, persona)
+        # Without the tag the POI would score high via popularity/budget;
+        # with the tag the constraint_multiplier is reduced to 0.25.
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(0.25)
+
+    def test_avoid_crowds_penalises_entertainment_poi(self, scorer, builder):
+        poi = _make_poi(category=POICategory.entertainment)
+        persona = _make_persona(builder)
+        persona.inferred_soft_preferences = ["avoid_crowds"]
+        result = scorer.score_one(poi, persona)
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(0.25)
+
+    def test_avoid_crowds_does_not_penalise_preferred_categories(self, scorer, builder):
+        """Nature and local_life POIs must be unaffected by avoid_crowds."""
+        for cat in (POICategory.nature_scenery, POICategory.local_life,
+                    POICategory.history_culture, POICategory.food_dining):
+            poi = _make_poi(category=cat)
+            persona = _make_persona(builder)
+            persona.inferred_soft_preferences = ["avoid_crowds"]
+            result = scorer.score_one(poi, persona)
+            assert result.score_breakdown.constraint_multiplier == pytest.approx(1.0), (
+                f"category {cat} should not be penalised"
+            )
+
+    def test_avoid_crowds_shopping_scores_lower_than_without_tag(self, scorer, builder):
+        poi = _make_poi(category=POICategory.shopping, popularity_score=9.0, quality_score=9.0)
+        persona_no_tag = _make_persona(builder)
+        persona_with_tag = _make_persona(builder)
+        persona_with_tag.inferred_soft_preferences = ["avoid_crowds"]
+        score_no  = scorer.score_one(poi, persona_no_tag).total_score
+        score_yes = scorer.score_one(poi, persona_with_tag).total_score
+        assert score_yes < score_no
+
+    def test_other_soft_prefs_do_not_affect_multiplier(self, scorer, builder):
+        """Tags unrelated to crowds must not change the constraint multiplier."""
+        poi = _make_poi(category=POICategory.shopping)
+        persona = _make_persona(builder)
+        persona.inferred_soft_preferences = ["relaxed_pace", "food_focused"]
+        result = scorer.score_one(poi, persona)
+        assert result.score_breakdown.constraint_multiplier == pytest.approx(1.0)

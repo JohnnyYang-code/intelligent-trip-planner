@@ -5,6 +5,103 @@ Releases follow the sprint structure described in README.md.
 
 ---
 
+## [Backend: preference alignment — soft preference hook + low-interest cap] — 2026-03-18
+
+### Changed
+
+**`app/core/poi_scorer.py` — `avoid_crowds` soft preference suppresses shopping/entertainment**
+
+- Added `_CROWD_SENSITIVE_CATEGORIES = {shopping, entertainment}` and
+  `_AVOID_CROWDS_MULTIPLIER = 0.25` module-level constants.
+- `_constraint_multiplier()` now reads `persona.inferred_soft_preferences`
+  (already populated before Stage 2 in `trip_planner.py`). When the
+  `"avoid_crowds"` tag is present, the constraint multiplier for shopping and
+  entertainment POIs is reduced by 75%, cutting a high-popularity shopping mall's
+  score from ~0.44 down to ~0.11 — well below any decently-rated nature or
+  local_life POI.
+- Added `POICategory` to the import line (needed for the new category check).
+- All other categories (nature_scenery, local_life, history_culture, food_dining,
+  art_museum) are unaffected. Tags other than `"avoid_crowds"` also leave the
+  multiplier unchanged.
+
+**`app/core/day_allocator.py` — low-interest category cap (1 per day)**
+
+- Added `_LOW_INTEREST_THRESHOLD = 0.08` and `_MAX_LOW_INTEREST_PER_DAY = 1`.
+- `_fill_day()` now accepts an `interest_vector: dict[str, float] | None`
+  parameter. When provided, any candidate whose category has a normalised
+  interest weight below `_LOW_INTEREST_THRESHOLD` is capped at
+  `_MAX_LOW_INTEREST_PER_DAY` (1) per day.
+- `allocate()` passes `persona.interest_vector` to `_fill_day()` on every day.
+- For a user who selects `preferred_categories = [nature_scenery, local_life]`,
+  unselected categories (shopping, art_museum, entertainment, etc.) land at
+  ~4% weight — well below the 8% threshold — so each can appear at most once
+  per day even if their raw score is high due to popularity/budget signals.
+- This cap acts as a backstop independent of free-text input (complements the
+  soft preference hook above).
+
+### Root cause fixed
+
+The combination of these two changes addresses the shopping overrepresentation
+reported for the Brisbane Nature + Local Life test case:
+
+| Signal source | Mechanism | Effect |
+|---|---|---|
+| Free-text ("less crowded") | `avoid_crowds` tag → 0.25× multiplier on shopping/entertainment | Westfield drops from ~0.44 to ~0.11 score |
+| Explicit category selection | Low-interest threshold cap → ≤ 1 unselected category/day | At most 1 shopping stop across each day even without free-text |
+
+### Tests added
+
+- `tests/test_poi_scorer.py` — `TestSoftPreferenceHook` (5 cases):
+  `avoid_crowds` sets multiplier to 0.25 for shopping; same for entertainment;
+  nature/local/history/food unaffected; total score lower with tag than without;
+  unrelated tags leave multiplier at 1.0.
+- `tests/test_day_allocator.py` — `TestLowInterestCap` (3 cases):
+  5 high-scoring unselected shopping POIs → at most 1 per day; preferred
+  category (nature) fills available slots without being capped; empty pool
+  does not crash.
+
+Total: 133 tests passing.
+
+---
+
+## [Frontend: time blocks + contextual POI card hints] — 2026-03-18
+
+### Changed
+
+**`frontend/src/App.tsx` — presentation-layer improvements (pure frontend, no backend changes)**
+
+- Added three pure helper functions above the `App` component:
+  - `getTimeBlock(time)` — converts `"HH:MM"` strings to `'Morning'` / `'Afternoon'` / `'Evening'`
+    (`< 12:00` → Morning, `12:00–17:29` → Afternoon, `≥ 17:30` → Evening).
+  - `formatBudgetTier(tier)` — maps enum values (`budget`, `mid_range`, `luxury`) to
+    display strings (`"Budget"`, `"Mid-range"`, `"Luxury"`).
+  - `getContextualHints(poi, timeBlock, weatherCondition)` — derives up to 3 contextual
+    hint strings from existing API fields (`category`, `indoor`, `weather.condition`):
+    meal slot label for food venues (Breakfast / Lunch stop / Dinner spot), `"Rainy-day pick"`
+    for indoor POIs on bad-weather days, `"Local atmosphere"` for `local_life` POIs,
+    `"Photo-friendly"` for outdoor `nature_scenery` POIs.
+
+- POI card left panel: replaced raw `suggested_start_time` timestamp (e.g. `"10:51"`) with
+  the broad time block label, styled with `.time-block-name`. The raw timestamp is still
+  used internally by `getTimeBlock()` but is no longer shown to users.
+
+- POI card meta row: `budget_tier` enum value is now passed through `formatBudgetTier()`
+  so the card shows `"Mid-range"` instead of `"mid_range"`.
+
+- POI card: added hint chip row below highlights, rendered only when at least one hint is
+  derived. Each chip uses the `.hint-chip` class.
+
+- Added `POI` to the TypeScript import list from `./types` (needed by `getContextualHints`).
+
+**`frontend/src/App.css` — new presentation styles**
+
+- `.time-block-name` — `font-size: 1.35rem; font-weight: 700; letter-spacing: 0.01em`.
+- `.hint-tags` — flex row with `gap: 6px`, wraps on overflow.
+- `.hint-chip` — pill badge: `background: #e8f4ff; color: #1a5f8a; border-radius: 999px;
+  padding: 3px 10px; font-size: 0.78rem; font-weight: 500`.
+
+---
+
 ## [Quality refinement: cost realism, budget consistency, diversity guarantee, meal timing] — 2026-03-18
 
 ### Changed

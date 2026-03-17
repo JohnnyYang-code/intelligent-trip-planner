@@ -274,3 +274,70 @@ class TestDiversityGuarantee:
         scored = scorer.score_all(food_pois, persona)
         result = allocator.allocate(scored, persona)
         assert len(result[0]) > 0  # day is not empty
+
+
+# ── Low-interest category cap ─────────────────────────────────────────────────
+
+class TestLowInterestCap:
+    def test_unselected_category_capped_at_one_per_day(
+        self, allocator, scorer
+    ):
+        """Shopping POIs (not preferred) should appear at most once per day."""
+        from app.schemas.trip_request import TripRequest
+        # Persona built from preferred_categories — shopping is NOT selected.
+        request = TripRequest(
+            destination="brisbane",
+            duration_days=1,
+            budget_level=BudgetLevel.mid_range,
+            travel_pace=TravelPace.moderate,
+            preferred_categories=[POICategory.nature_scenery, POICategory.local_life],
+        )
+        from app.core.persona_builder import PersonaBuilder as PB
+        persona = PB().build(request)
+
+        # 5 high-scoring shopping POIs — without the cap they could fill the day.
+        shopping_pois = [
+            _make_poi(
+                id=f"s{i}", category=POICategory.shopping,
+                popularity_score=9.0, quality_score=9.0, duration_hours=1.0,
+            )
+            for i in range(5)
+        ]
+        scored = scorer.score_all(shopping_pois, persona)
+        result = allocator.allocate(scored, persona)
+        shopping_count = sum(
+            1 for sp in result[0] if sp.poi.category == POICategory.shopping
+        )
+        assert shopping_count <= 1
+
+    def test_preferred_category_not_capped(self, allocator, scorer):
+        """Preferred categories (high interest weight) must not be capped."""
+        from app.schemas.trip_request import TripRequest
+        from app.core.persona_builder import PersonaBuilder as PB
+        request = TripRequest(
+            destination="brisbane",
+            duration_days=1,
+            budget_level=BudgetLevel.mid_range,
+            travel_pace=TravelPace.moderate,
+            preferred_categories=[POICategory.nature_scenery],
+        )
+        persona = PB().build(request)
+
+        nature_pois = [
+            _make_poi(id=f"n{i}", category=POICategory.nature_scenery, duration_hours=1.0)
+            for i in range(5)
+        ]
+        scored = scorer.score_all(nature_pois, persona)
+        result = allocator.allocate(scored, persona)
+        # With relaxed pace max=3; all should be nature (no cap on preferred).
+        nature_count = sum(
+            1 for sp in result[0] if sp.poi.category == POICategory.nature_scenery
+        )
+        assert nature_count >= 2  # preferred category fills available slots
+
+    def test_low_interest_cap_does_not_crash_on_empty_pool(
+        self, allocator, builder
+    ):
+        persona = _make_persona(builder, duration_days=1)
+        result = allocator.allocate([], persona)
+        assert result == [[]]

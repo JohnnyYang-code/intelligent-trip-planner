@@ -38,21 +38,44 @@ button {
   border-radius: 32px;
   padding: 28px;
   background:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.16), transparent 0 18%),
+    radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.1), transparent 0 12%),
     linear-gradient(135deg, rgba(5, 52, 89, 0.92), rgba(18, 96, 150, 0.78)),
     linear-gradient(180deg, #0a3556, #144d73);
   color: #fff;
   box-shadow: 0 22px 60px rgba(9, 39, 65, 0.18);
 }
 
+.travel-hero::before,
 .travel-hero::after {
   content: '';
   position: absolute;
-  inset: auto -120px -120px auto;
+  pointer-events: none;
+}
+
+.travel-hero::before {
+  top: 58px;
+  left: 58px;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 22px rgba(255, 255, 255, 0.04),
+    0 0 0 48px rgba(255, 255, 255, 0.025);
+  opacity: 0.75;
+}
+
+.travel-hero::after {
+  right: -70px;
+  bottom: -72px;
   width: 360px;
   height: 360px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 62%);
-  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15), transparent 58%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 72%);
+  opacity: 0.9;
 }
 
 .topbar,
@@ -522,6 +545,29 @@ textarea:focus {
 .poi-image-placeholder span {
   font-size: 1.4rem;
   font-weight: 700;
+}
+
+.time-block-name {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.hint-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hint-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: #e8f4ff;
+  color: #1a5f8a;
+  white-space: nowrap;
 }
 
 .poi-content {

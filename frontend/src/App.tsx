@@ -4,6 +4,7 @@ import { getHealth, planTripFromText, planTripStructured } from './api'
 import type {
   HealthResponse,
   ItineraryResponse,
+  POI,
   POICategory,
   StructuredTripRequest,
 } from './types'
@@ -35,6 +36,43 @@ const naturalExample =
 
 function formatCategory(value: string) {
   return value.replaceAll('_', ' ')
+}
+
+function getTimeBlock(time: string): 'Morning' | 'Afternoon' | 'Evening' {
+  const [h, m] = time.split(':').map(Number)
+  const mins = h * 60 + (m ?? 0)
+  if (mins < 12 * 60) return 'Morning'
+  if (mins < 17 * 60 + 30) return 'Afternoon'
+  return 'Evening'
+}
+
+function formatBudgetTier(tier: string): string {
+  const map: Record<string, string> = {
+    budget: 'Budget',
+    mid_range: 'Mid-range',
+    luxury: 'Luxury',
+  }
+  return map[tier] ?? tier
+}
+
+function getContextualHints(
+  poi: POI,
+  timeBlock: 'Morning' | 'Afternoon' | 'Evening',
+  weatherCondition?: string,
+): string[] {
+  const hints: string[] = []
+  if (poi.category === 'food_dining') {
+    hints.push(
+      timeBlock === 'Morning' ? 'Breakfast'
+      : timeBlock === 'Afternoon' ? 'Lunch stop'
+      : 'Dinner spot',
+    )
+  }
+  const badWeather = ['Rainy', 'Foggy', 'Snowy'].includes(weatherCondition ?? '')
+  if (badWeather && poi.indoor) hints.push('Rainy-day pick')
+  if (poi.category === 'local_life') hints.push('Local atmosphere')
+  if (poi.category === 'nature_scenery' && !poi.indoor) hints.push('Photo-friendly')
+  return hints.slice(0, 3)
 }
 
 function App() {
@@ -478,7 +516,9 @@ function App() {
                     {day.pois.map((scheduledPoi) => (
                       <div key={`${day.day_number}-${scheduledPoi.poi.id}`} className="poi-card product-poi-card">
                         <div className="poi-image-placeholder">
-                          <span>{scheduledPoi.suggested_start_time}</span>
+                          <span className="time-block-name">
+                            {getTimeBlock(scheduledPoi.suggested_start_time)}
+                          </span>
                           <small>{scheduledPoi.suggested_duration_hours}h stay</small>
                         </div>
 
@@ -495,7 +535,7 @@ function App() {
 
                           <div className="poi-meta-row product-meta-row">
                             <span>From ¥{Math.round(scheduledPoi.poi.avg_cost_cny)}</span>
-                            <span>{scheduledPoi.poi.budget_tier}</span>
+                            <span>{formatBudgetTier(scheduledPoi.poi.budget_tier)}</span>
                             {scheduledPoi.poi.opening_hours && (
                               <span>{scheduledPoi.poi.opening_hours}</span>
                             )}
@@ -518,6 +558,18 @@ function App() {
                               ))}
                             </div>
                           )}
+
+                          {(() => {
+                            const timeBlock = getTimeBlock(scheduledPoi.suggested_start_time)
+                            const hints = getContextualHints(scheduledPoi.poi, timeBlock, day.weather?.condition)
+                            return hints.length > 0 ? (
+                              <div className="hint-tags">
+                                {hints.map((hint) => (
+                                  <span key={hint} className="hint-chip">{hint}</span>
+                                ))}
+                              </div>
+                            ) : null
+                          })()}
                         </div>
                       </div>
                     ))}

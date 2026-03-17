@@ -1,11 +1,22 @@
 import logging
 
 from app.config.settings import get_settings
-from app.schemas.common import BudgetLevel
+from app.schemas.common import BudgetLevel, POICategory
 from app.schemas.persona import TravelerPersona
 from app.schemas.poi import POI, ScoreBreakdown, ScoredPOI
 
 logger = logging.getLogger(__name__)
+
+# Categories that feel inherently crowded / commercial.
+# When a traveller has the "avoid_crowds" soft preference inferred from their
+# free-text input, POIs in these categories receive a strong soft penalty so
+# that unselected shopping and entertainment venues don't sneak in via high
+# popularity or budget-fit scores alone.
+_CROWD_SENSITIVE_CATEGORIES: frozenset[POICategory] = frozenset({
+    POICategory.shopping,
+    POICategory.entertainment,
+})
+_AVOID_CROWDS_MULTIPLIER: float = 0.25   # 75% score reduction
 
 # Budget tier ordering used to compute tier gap for scoring.
 _BUDGET_ORDER: dict[BudgetLevel, int] = {
@@ -161,5 +172,15 @@ class POIScorer:
         # Soft penalty: not accessible when travelling with elderly.
         if constraints.with_elderly and not poi.accessible:
             multiplier *= 0.4
+
+        # Soft penalty: avoid_crowds preference suppresses shopping and
+        # entertainment POIs, which tend to be busy commercial venues.
+        # The tag is inferred from free-text such as "less crowded" or
+        # "avoid tourist traps" before Stage 2 scoring runs.
+        if (
+            "avoid_crowds" in persona.inferred_soft_preferences
+            and poi.category in _CROWD_SENSITIVE_CATEGORIES
+        ):
+            multiplier *= _AVOID_CROWDS_MULTIPLIER
 
         return multiplier
