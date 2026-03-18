@@ -191,12 +191,14 @@ function App() {
   return (
     <div className="app-shell">
       <header className="travel-hero">
+        <div className="hero-grid-overlay" aria-hidden="true" />
+
         <nav className="topbar">
           <div className="brand-mark">
-            <span className="brand-logo">✈</span>
+            <span className="brand-logo">✦</span>
             <div>
               <strong>TripTailor</strong>
-              <p>Smart itinerary planning</p>
+              <p>Editorial trip planning for modern city breaks</p>
             </div>
           </div>
           <div className="topbar-badges">
@@ -209,17 +211,40 @@ function App() {
 
         <div className="hero-content">
           <div className="hero-copy-block">
-            <p className="eyebrow light">Plan smarter trips</p>
-            <h1>Build a personalized itinerary in minutes</h1>
+            <p className="eyebrow light">Precision travel planning · with taste</p>
+            <h1>Design a trip that feels considered, calm, and genuinely yours.</h1>
             <p className="hero-copy light-copy">
-              Discover a cleaner way to plan city trips with tailored pacing, category-based
-              preferences, and day-by-day recommendations that feel like a real travel product.
+              A refined planning workspace for city travel — combining structured preferences,
+              natural-language requests, and day-by-day recommendations into something that feels
+              more like a travel editorial than a generic form.
             </p>
 
             <div className="hero-pills">
-              <span>Food, culture, local life</span>
-              <span>Natural-language trip requests</span>
-              <span>Day-by-day itineraries</span>
+              <span>Multi-day itineraries</span>
+              <span>Preference-aware suggestions</span>
+              <span>Natural language + structured mode</span>
+            </div>
+
+            <div className="hero-ledger">
+              <div className="ledger-card accent-card">
+                <span className="ledger-label">Current destination</span>
+                <strong>{structuredForm.destination || 'Choose a city'}</strong>
+                <p>
+                  {mode === 'structured'
+                    ? 'Fine-tune days, budget, pace, and category interests.'
+                    : 'Describe the trip in plain language and let the planner infer the structure.'}
+                </p>
+              </div>
+              <div className="ledger-card">
+                <span className="ledger-label">Travel profile</span>
+                <strong>
+                  {selectedCategoryShorts.length > 0 ? selectedCategoryShorts.join(' · ') : 'Open ended'}
+                </strong>
+                <p>
+                  {structuredForm.duration_days} day plan · {formatBudgetTier(structuredForm.budget_level)} ·{' '}
+                  {structuredForm.travel_pace}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -243,6 +268,14 @@ function App() {
                   Describe it
                 </button>
               </div>
+            </div>
+
+            <div className="planner-note">
+              <span className="planner-note-kicker">Planner brief</span>
+              <p>
+                Start with a city and a few taste signals. The planner will shape them into a
+                balanced route with pacing, themed days, and practical stop ordering.
+              </p>
             </div>
 
             {mode === 'structured' ? (
@@ -348,7 +381,7 @@ function App() {
                   />
                 </label>
                 <div className="example-callout travel-example">
-                  <strong>Example</strong>
+                  <strong>Example brief</strong>
                   <p>{naturalExample}</p>
                 </div>
               </div>
@@ -373,14 +406,14 @@ function App() {
         <div className="quick-card">
           <span className="quick-label">Input modes</span>
           <strong>Structured + natural language</strong>
-          <p>Choose a classic travel form or just describe the trip you want.</p>
+          <p>Choose a classic travel form or write the trip like a brief to a travel editor.</p>
         </div>
         <div className="quick-card">
           <span className="quick-label">Trip style</span>
           <strong>
             {selectedCategoryShorts.length > 0 ? selectedCategoryShorts.join(' · ') : 'Flexible'}
           </strong>
-          <p>Mix categories like food, history, nature, and local life.</p>
+          <p>Blend food, culture, nature, museums, local neighborhoods, and more.</p>
         </div>
         <div className="quick-card">
           <span className="quick-label">Planner status</span>
@@ -414,11 +447,17 @@ function App() {
 
           {!loading && !result && !error && (
             <div className="empty-state travel-empty">
+              <div className="empty-orb" aria-hidden="true" />
               <h3>Start with a destination</h3>
               <p>
-                Search for a city, choose your travel style, and we&apos;ll generate a complete
-                day-by-day itinerary with recommendations and timing.
+                Choose a city, shape the mood of the trip, and the planner will generate a polished
+                multi-day itinerary with timing, route balance, and recommendation notes.
               </p>
+              <div className="empty-state-pills">
+                <span>Balanced pacing</span>
+                <span>Day themes</span>
+                <span>Contextual activity picks</span>
+              </div>
             </div>
           )}
 
@@ -455,10 +494,10 @@ function App() {
                 </div>
 
                 <div className="summary-block feature-block product-card soft-card">
-                  <h4>Good to know</h4>
+                  <h4>Planning model</h4>
                   <p>
-                    Powered by structured itinerary planning with LLM-supported input parsing and
-                    recommendation copy.
+                    Structured itinerary planning with natural-language parsing, preference-aware
+                    scoring, day allocation, and route ordering.
                   </p>
                 </div>
               </div>

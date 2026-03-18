@@ -1,6 +1,8 @@
 :root {
-  color: #163046;
-  background: linear-gradient(180deg, #fff7ef 0%, #fffdf8 28%, #f6f8fb 100%);
+  color: #e8edf5;
+  background:
+    radial-gradient(circle at top, rgba(57, 94, 164, 0.26), transparent 34%),
+    linear-gradient(180deg, #08111f 0%, #0b1425 48%, #101d30 100%);
 }
 
 * {
@@ -11,7 +13,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: #17324d;
+  color: #ebf1f7;
 }
 
 button,
@@ -27,55 +29,58 @@ button {
 }
 
 .app-shell {
-  width: min(1380px, calc(100vw - 32px));
+  width: min(1440px, calc(100vw - 40px));
   margin: 0 auto;
-  padding: 24px 0 56px;
+  padding: 28px 0 64px;
 }
 
 .travel-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 32px;
-  padding: 28px;
+  border-radius: 36px;
+  padding: 30px;
   background:
-    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.16), transparent 0 18%),
-    radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.1), transparent 0 12%),
-    linear-gradient(135deg, rgba(5, 52, 89, 0.92), rgba(18, 96, 150, 0.78)),
-    linear-gradient(180deg, #0a3556, #144d73);
+    radial-gradient(circle at 12% 18%, rgba(240, 188, 124, 0.16), transparent 0 24%),
+    radial-gradient(circle at 80% 16%, rgba(92, 148, 255, 0.2), transparent 0 18%),
+    linear-gradient(135deg, rgba(7, 15, 31, 0.96), rgba(10, 36, 66, 0.88) 55%, rgba(16, 67, 95, 0.9));
   color: #fff;
-  box-shadow: 0 22px 60px rgba(9, 39, 65, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 30px 80px rgba(2, 8, 20, 0.45);
 }
 
 .travel-hero::before,
-.travel-hero::after {
+.travel-hero::after,
+.hero-grid-overlay {
   content: '';
   position: absolute;
   pointer-events: none;
 }
 
 .travel-hero::before {
-  top: 58px;
-  left: 58px;
-  width: 210px;
-  height: 210px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow:
-    0 0 0 22px rgba(255, 255, 255, 0.04),
-    0 0 0 48px rgba(255, 255, 255, 0.025);
-  opacity: 0.75;
-}
-
-.travel-hero::after {
-  right: -70px;
-  bottom: -72px;
+  inset: auto auto -140px -120px;
   width: 360px;
   height: 360px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15), transparent 58%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 72%);
-  opacity: 0.9;
+  background: radial-gradient(circle, rgba(255, 184, 108, 0.18), transparent 68%);
+  filter: blur(6px);
+}
+
+.travel-hero::after {
+  inset: 60px -90px auto auto;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(110, 173, 255, 0.16), transparent 64%);
+}
+
+.hero-grid-overlay {
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
+  opacity: 0.32;
 }
 
 .topbar,
@@ -93,30 +98,50 @@ button {
   gap: 16px;
 }
 
+.topbar,
+.hero-content,
+.results-main,
+.quick-card,
+.day-card,
+.product-poi-card,
+.destination-hero-card,
+.product-card,
+.day-meta-card,
+.empty-state,
+.message,
+.search-card {
+  position: relative;
+  z-index: 1;
+}
+
 .topbar {
-  margin-bottom: 28px;
+  margin-bottom: 34px;
 }
 
 .brand-mark {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .brand-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 1.2rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font-size: 1.1rem;
 }
 
 .brand-mark strong {
   display: block;
-  font-size: 1rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
 }
 
 .brand-mark p,
@@ -132,17 +157,20 @@ button {
 .summary-block li,
 .day-meta-card p,
 .poi-reason,
-.product-card p {
+.product-card p,
+.ledger-card p,
+.planner-note p {
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .brand-mark p,
 .light-copy,
 .product-badge,
 .status-dot,
-.hero-pills span {
-  color: rgba(255, 255, 255, 0.86);
+.hero-pills span,
+.ledger-card p {
+  color: rgba(239, 244, 250, 0.84);
 }
 
 .topbar-badges,
@@ -152,10 +180,13 @@ button {
 .poi-meta-row,
 .inline-tags,
 .chip-grid,
-.quick-glance-grid {
+.quick-glance-grid,
+.empty-state-pills,
+.destination-stats,
+.hero-ledger {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 .product-badge,
@@ -166,30 +197,36 @@ button {
 .category-tag,
 .weather-badge,
 .chip,
-.inline-tags span {
+.inline-tags span,
+.empty-state-pills span,
+.hint-chip {
   border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 0.84rem;
+  padding: 8px 13px;
+  font-size: 0.82rem;
 }
 
 .product-badge,
 .hero-pills span,
 .status-dot.loading {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .status-dot.ok {
-  background: rgba(99, 241, 174, 0.18);
-  color: #d8ffe9;
+  background: rgba(116, 237, 188, 0.15);
+  color: #d5fff0;
+  border: 1px solid rgba(116, 237, 188, 0.18);
 }
 
 .hero-content {
   align-items: stretch;
+  gap: 30px;
 }
 
 .hero-copy-block {
   flex: 1;
-  max-width: 620px;
+  max-width: 660px;
+  padding: 26px 6px 12px 2px;
 }
 
 .hero-copy-block h1,
@@ -202,60 +239,97 @@ button {
 }
 
 .hero-copy-block h1 {
-  font-size: clamp(2.4rem, 4vw, 4.4rem);
-  line-height: 1.04;
-  max-width: 10ch;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(3.15rem, 5vw, 5.8rem);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+  max-width: 11ch;
 }
 
 .eyebrow,
-.meta-label {
+.meta-label,
+.ledger-label,
+.planner-note-kicker,
+.quick-label {
   margin: 0 0 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.75rem;
-  color: #7a91a8;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  color: #8395ab;
 }
 
-.eyebrow.light {
-  color: rgba(255, 255, 255, 0.72);
+.eyebrow.light,
+.ledger-label,
+.planner-note-kicker {
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .hero-copy {
-  margin: 18px 0 0;
-  max-width: 56ch;
-  font-size: 1.06rem;
+  margin: 22px 0 0;
+  max-width: 58ch;
+  font-size: 1.05rem;
 }
 
-.panel,
-.quick-card,
-.destination-hero-card,
-.product-card,
-.day-card,
-.message,
-.empty-state,
-.example-callout,
-.day-meta-card {
-  background: #fff;
-  border: 1px solid rgba(222, 229, 238, 0.9);
-  box-shadow: 0 12px 40px rgba(18, 52, 82, 0.08);
+.hero-ledger {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
 }
 
-.panel,
-.quick-card,
-.destination-hero-card,
-.product-card,
-.day-card,
-.empty-state,
-.message,
-.example-callout,
-.day-meta-card {
+.ledger-card {
+  padding: 18px 20px;
   border-radius: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.ledger-card strong {
+  display: block;
+  margin-bottom: 6px;
+  font-family: 'Fraunces', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.accent-card {
+  background: linear-gradient(135deg, rgba(255, 179, 95, 0.16), rgba(255, 255, 255, 0.08));
+}
+
+.panel,
+.quick-card,
+.destination-hero-card,
+.product-card,
+.day-card,
+.message,
+.empty-state,
+.example-callout,
+.day-meta-card {
+  background: rgba(246, 249, 253, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 16px 40px rgba(3, 10, 24, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.panel,
+.quick-card,
+.destination-hero-card,
+.product-card,
+.day-card,
+.empty-state,
+.message,
+.example-callout,
+.day-meta-card {
+  border-radius: 28px;
 }
 
 .search-card {
-  width: min(520px, 100%);
-  padding: 22px;
-  color: #17324d;
+  width: min(540px, 100%);
+  padding: 24px;
+  color: #102238;
+  background: rgba(249, 251, 255, 0.94);
+  backdrop-filter: blur(18px);
 }
 
 .search-card-header {
@@ -263,15 +337,18 @@ button {
 }
 
 .search-card-header h2 {
-  font-size: 1.35rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1.8rem;
+  letter-spacing: -0.03em;
 }
 
 .mode-toggle {
   display: inline-flex;
   gap: 8px;
   padding: 6px;
-  background: #eef4f8;
+  background: #e8eef7;
   border-radius: 999px;
+  border: 1px solid rgba(40, 70, 104, 0.08);
 }
 
 .mode-toggle button,
@@ -288,9 +365,28 @@ button {
 }
 
 .mode-toggle button.active {
-  background: #17324d;
+  background: #102947;
   color: #fff;
   font-weight: 700;
+  box-shadow: 0 10px 22px rgba(16, 41, 71, 0.18);
+}
+
+.planner-note {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(14, 35, 62, 0.04), rgba(89, 149, 255, 0.08));
+  border: 1px solid rgba(73, 107, 156, 0.12);
+}
+
+.planner-note-kicker {
+  display: block;
+  margin-bottom: 6px;
+  color: #7187a3;
+}
+
+.planner-note p {
+  color: #4a6077;
 }
 
 .form-stack {
@@ -306,7 +402,7 @@ label,
 .field-label {
   display: grid;
   gap: 10px;
-  color: #24415b;
+  color: #1d3248;
   font-weight: 600;
 }
 
@@ -314,23 +410,25 @@ input,
 select,
 textarea {
   width: 100%;
-  border-radius: 16px;
-  border: 1px solid #d9e3eb;
-  background: #f9fbfc;
+  border-radius: 18px;
+  border: 1px solid rgba(63, 94, 128, 0.14);
+  background: rgba(255, 255, 255, 0.85);
   color: #17324d;
-  padding: 14px 16px;
+  padding: 15px 16px;
   resize: vertical;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid rgba(20, 123, 196, 0.18);
-  border-color: #1d77bf;
+  outline: 2px solid rgba(46, 112, 186, 0.18);
+  border-color: #2a6fb3;
 }
 
 .three-column-grid,
-.summary-grid.product-summary-grid {
+.summary-grid.product-summary-grid,
+.product-day-meta {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
@@ -341,30 +439,36 @@ textarea:focus {
 }
 
 .chip {
-  background: #f6f8fb;
-  border: 1px solid #dfe7ee;
-  color: #32516d;
+  background: rgba(244, 247, 251, 0.88);
+  border: 1px solid rgba(113, 139, 169, 0.18);
+  color: #35506a;
 }
 
 .chip.selected {
-  background: #17324d;
-  border-color: #17324d;
+  background: linear-gradient(135deg, #122b48, #1d4d75);
+  border-color: rgba(18, 43, 72, 0.9);
   color: #fff;
+  box-shadow: 0 12px 24px rgba(18, 43, 72, 0.2);
 }
 
 .travel-example {
-  background: #f7fbff;
+  background: linear-gradient(135deg, #f5f9ff, #f9f6ff);
   padding: 16px;
 }
 
 .search-actions {
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .primary {
-  background: linear-gradient(135deg, #ff8c42, #ff6f3d);
+  background: linear-gradient(135deg, #ffb15c, #ff7d51);
   color: #fff;
   font-weight: 700;
+  box-shadow: 0 16px 30px rgba(255, 125, 81, 0.3);
+}
+
+.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .large-cta {
@@ -372,9 +476,18 @@ textarea:focus {
 }
 
 .secondary {
-  background: #f4f7fa;
+  background: rgba(243, 246, 250, 0.88);
   color: #24415b;
-  border: 1px solid #dfe7ee;
+  border: 1px solid rgba(120, 143, 168, 0.18);
+}
+
+.secondary:hover,
+.chip:hover,
+.mode-toggle button:hover,
+.product-poi-card:hover,
+.quick-card:hover,
+.day-card:hover {
+  transform: translateY(-1px);
 }
 
 .primary:disabled {
@@ -383,29 +496,32 @@ textarea:focus {
 }
 
 .quick-glance-grid {
-  margin: 24px 0;
+  margin: 26px 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
 .quick-card {
-  padding: 18px 20px;
+  padding: 22px;
+  color: #10243a;
+  background: rgba(245, 248, 252, 0.9);
 }
 
 .quick-label {
   display: block;
   margin-bottom: 8px;
-  color: #7d91a3;
-  font-size: 0.82rem;
+  color: #7588a0;
 }
 
 .quick-card strong,
 .destination-stats strong,
 .summary-metrics strong {
   display: block;
-  color: #163046;
-  font-size: 1.1rem;
+  color: #12283d;
+  font-family: 'Fraunces', serif;
+  font-size: 1.32rem;
+  letter-spacing: -0.03em;
 }
 
 .results-layout {
@@ -413,23 +529,54 @@ textarea:focus {
 }
 
 .results-main {
-  padding: 24px;
+  padding: 26px;
+  background: rgba(243, 247, 252, 0.9);
+  color: #12283e;
 }
 
 .product-heading {
   margin-bottom: 18px;
 }
 
+.section-heading h2,
+.destination-hero-card h3,
+.day-card h3,
+.poi-heading h4,
+.summary-block h4,
+.empty-state h3 {
+  font-family: 'Fraunces', serif;
+  letter-spacing: -0.03em;
+}
+
 .result-badges span,
 .day-poi-count,
-.inline-tags span {
-  background: #edf7ff;
-  color: #22649a;
+.inline-tags span,
+.empty-state-pills span {
+  background: #e8f0fb;
+  color: #25527d;
 }
 
 .empty-state,
 .message {
-  padding: 22px;
+  padding: 28px;
+}
+
+.empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(100, 156, 255, 0.14), transparent 24%),
+    linear-gradient(135deg, rgba(255, 250, 243, 0.86), rgba(244, 249, 255, 0.94));
+}
+
+.empty-orb {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffd29f, #6e9dff);
+  box-shadow: 0 20px 40px rgba(80, 119, 191, 0.22);
 }
 
 .message.error {
@@ -450,16 +597,18 @@ textarea:focus {
 }
 
 .destination-hero-card {
-  padding: 24px;
+  padding: 26px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1.2fr 0.95fr;
   gap: 20px;
-  background: linear-gradient(135deg, #fff7ef, #ffffff);
+  background:
+    radial-gradient(circle at top right, rgba(255, 191, 126, 0.22), transparent 22%),
+    linear-gradient(135deg, #fff9f1, #f5f9ff 68%);
 }
 
 .destination-overview {
   margin-top: 10px;
-  color: #536b82;
+  color: #556c84;
 }
 
 .destination-stats {
@@ -472,9 +621,9 @@ textarea:focus {
 .product-card,
 .product-card-lite {
   padding: 18px;
-  border-radius: 18px;
-  background: #fff;
-  border: 1px solid #e5edf3;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(203, 216, 230, 0.72);
 }
 
 .destination-stats span,
@@ -489,7 +638,7 @@ textarea:focus {
 }
 
 .soft-card {
-  background: linear-gradient(135deg, #f9fcff, #fff9f3);
+  background: linear-gradient(135deg, rgba(244, 248, 255, 0.94), rgba(255, 248, 239, 0.94));
 }
 
 .notes-block {
@@ -497,7 +646,8 @@ textarea:focus {
 }
 
 .itinerary-day-card {
-  padding: 20px;
+  padding: 22px;
+  background: rgba(250, 252, 255, 0.92);
 }
 
 .product-day-header {
@@ -511,6 +661,7 @@ textarea:focus {
 
 .product-day-meta {
   margin-bottom: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .product-poi-grid {
@@ -522,11 +673,16 @@ textarea:focus {
 .product-poi-card {
   overflow: hidden;
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 170px 1fr;
   padding: 0;
-  border: 1px solid #e6edf3;
-  border-radius: 22px;
-  background: #fff;
+  border: 1px solid rgba(206, 219, 231, 0.8);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.product-poi-card:hover {
+  box-shadow: 0 20px 38px rgba(22, 52, 82, 0.12);
 }
 
 .poi-image-placeholder {
@@ -534,21 +690,22 @@ textarea:focus {
   flex-direction: column;
   justify-content: flex-end;
   gap: 6px;
-  min-height: 220px;
-  padding: 18px;
+  min-height: 230px;
+  padding: 20px;
   background:
-    linear-gradient(180deg, rgba(14, 78, 121, 0.08), rgba(14, 78, 121, 0.28)),
-    linear-gradient(135deg, #8fd3ff, #ffd5a8);
-  color: #0f3554;
+    linear-gradient(180deg, rgba(7, 20, 36, 0.06), rgba(7, 20, 36, 0.28)),
+    linear-gradient(155deg, #79a7ff, #ffd2a6 54%, #f8b36d);
+  color: #102947;
 }
 
 .poi-image-placeholder span {
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-family: 'Fraunces', serif;
+  font-size: 1.56rem;
+  font-weight: 600;
 }
 
 .time-block-name {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -561,10 +718,8 @@ textarea:focus {
 
 .hint-chip {
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 500;
+  padding: 4px 10px;
+  font-weight: 600;
   background: #e8f4ff;
   color: #1a5f8a;
   white-space: nowrap;
@@ -592,13 +747,13 @@ textarea:focus {
 }
 
 .product-meta-row {
-  color: #7b8ea0;
+  color: #6f8396;
   font-size: 0.9rem;
 }
 
 .product-highlight {
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #fff4ea;
   color: #8d4b1e;
 }
@@ -615,8 +770,8 @@ textarea:focus {
 @media (max-width: 1180px) {
   .hero-content,
   .destination-hero-card,
-  .product-poi-grid,
-  .quick-glance-grid {
+  .quick-glance-grid,
+  .hero-ledger {
     grid-template-columns: 1fr;
   }
 
@@ -627,13 +782,18 @@ textarea:focus {
   .search-card {
     width: 100%;
   }
+
+  .product-poi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
   .three-column-grid,
   .destination-stats,
   .product-summary-grid,
-  .product-poi-card {
+  .product-poi-card,
+  .product-day-meta {
     grid-template-columns: 1fr;
   }
 
@@ -651,6 +811,10 @@ textarea:focus {
   .day-header-side {
     justify-content: flex-start;
   }
+
+  .hero-copy-block h1 {
+    max-width: 12ch;
+  }
 }
 
 @media (max-width: 720px) {
@@ -661,7 +825,12 @@ textarea:focus {
 
   .travel-hero,
   .results-main,
-  .search-card {
+  .search-card,
+  .quick-card,
+  .destination-hero-card,
+  .day-card,
+  .empty-state,
+  .message {
     padding: 18px;
     border-radius: 24px;
   }
@@ -672,5 +841,13 @@ textarea:focus {
 
   .mode-toggle button {
     flex: 1;
+  }
+
+  .hero-copy-block {
+    padding-top: 8px;
+  }
+
+  .hero-copy-block h1 {
+    font-size: clamp(2.5rem, 12vw, 3.6rem);
   }
 }
