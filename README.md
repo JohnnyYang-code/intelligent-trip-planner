@@ -69,6 +69,27 @@ Natural Language Input (optional)
 
 ---
 
+## Prompt Design
+
+All prompts live in `app/llm/prompt_templates.py`. The system uses 5 purpose-specific prompts, each tightly scoped to a single task:
+
+| Prompt | Purpose | Max tokens |
+|---|---|---|
+| `build_parse_trip_prompt` | Extract structured fields (destination, dates, budget, pace, categories) from free-text input | 350 |
+| `build_soft_preference_prompt` | Convert free-text preferences to snake_case tags (e.g. `avoid_crowds`, `vegetarian_food`) | 80 |
+| `build_overview_prompt` | Generate a 2–3 sentence trip introduction after planning completes | 200 |
+| `build_day_narrative_prompt` | Generate a 2–3 sentence weather-aware summary per day | 150 |
+| `build_poi_reason_prompt` | Generate a single recommendation sentence per POI (≤40 chars) | 60 |
+
+**Design principles:**
+
+- **Strict output contracts** — every prompt specifies exact format, length, and what to omit (e.g. "no bullets", "one sentence only", "return empty string if nothing found"). This keeps downstream parsing simple and predictable.
+- **LLM as narrator, not planner** — the first two prompts run before scoring (to enrich the input), the last three run after the 4-stage pipeline (to describe its output). The LLM never decides which POIs to include or how to schedule them.
+- **Minimal token budgets** — each prompt is sized to its task; POI reasons get 60 tokens, full trip parsing gets 350. This keeps latency low and forces concise outputs.
+- **Provider differences handled at the call site** — OpenAI uses native `json_object` mode for structured outputs; Claude responses are post-processed with regex to strip markdown fences before JSON parsing.
+
+---
+
 ## Quick Start
 
 ### Backend
@@ -180,6 +201,65 @@ intelligent-trip-planner/
 │
 └── tests/                         # 141 tests across all core modules
 ```
+
+---
+
+## Done
+
+**Core pipeline**
+- [x] Deterministic 4-stage planning pipeline (PersonaBuilder → POIScorer → DayAllocator → RouteOptimizer)
+- [x] Preference enforcement with stacking soft penalties (e.g. avoid_crowds ×0.25, unselected category ×0.40)
+- [x] Weather-aware scheduling and geographic clustering (≤40 km same-day travel)
+- [x] 141 unit tests across all core modules
+
+**LLM integration** (`app/llm/`)
+- [x] Natural language trip request parsing — extracts destination, dates, budget, pace, and categories from free text
+- [x] Soft preference inference — converts free-text preferences to structured tags before scoring
+- [x] Post-planning text generation: trip overview, per-day narratives, per-POI recommendation reasons
+- [x] LLM runs entirely after the 4-stage pipeline — narrates decisions, never makes them
+- [x] Parallel async generation via `asyncio.gather` (overview + day narratives + POI reasons)
+- [x] Dual provider support: Claude (Anthropic SDK, manual JSON extraction) and OpenAI (native `json_object` mode)
+
+**External APIs** (`app/integrations/`)
+- [x] **Google Places** — geocoding + nearby search per category (60 candidates, 15 km radius); log-normalized popularity scores
+- [x] **Google Maps / Amap** — driving distance matrix for route optimization; Amap includes WGS-84 → GCJ-02 coordinate conversion
+- [x] **OpenWeatherMap** — 5-day/3-hour forecast with noon-slot sampling; condition → travel advisory mapping
+- [x] **Anthropic API** — `claude-3-5-haiku-20241022`
+- [x] **OpenAI API** — `gpt-4o-mini`
+
+**Frontend & DX**
+- [x] React 19 + TypeScript + Tailwind CSS 4 frontend
+- [x] Dual input modes: structured form and natural language
+- [x] Bilingual support (English and Chinese)
+
+---
+
+## To Do
+
+**POI Scorer improvements**
+- [ ] Opening hours awareness — filter or penalize POIs closed on the scheduled travel day/time slot
+- [ ] Time-of-day scoring — boost category weights by time (e.g. parks at sunrise, dining in evenings)
+- [ ] Category diversity cap — penalize scheduling the same category more than N times per day
+- [ ] Seasonal popularity adjustment — scale `popularity_score` by month (e.g. outdoor venues in summer)
+- [ ] Dynamic crowding model — use day-of-week and holiday calendar to adjust `avoid_crowds` multiplier
+
+**Itinerary realism**
+- [ ] Real travel time in DayAllocator — replace Haversine straight-line estimate with actual Maps API driving/transit time
+- [ ] Rest buffer insertion — add pace-dependent gaps between POIs (e.g. relaxed pace → 20 min buffer)
+- [ ] Meal slot pinning — hard-constrain breakfast/lunch/dinner to realistic time windows
+- [ ] Visit duration variability — adjust estimated duration by group size, pace, and POI type
+- [ ] Reservation flags — identify POIs requiring advance booking and surface warnings in itinerary output
+
+---
+
+## Blockers
+
+- **Itinerary realism gap** *(main)* — the pipeline has no awareness of actual visit durations, real travel times between POIs, or opening hour constraints; generated schedules can exceed what's physically doable in a day
+- **Travel time is a straight-line estimate** — DayAllocator uses Haversine distance with a fixed speed; actual driving/transit time in dense cities is 2–3× longer, making "feasible" days infeasible in practice
+- **No opening hours in POI data** — Google Places nearby search doesn't fetch `opening_hours` in the current implementation; POIs get scheduled regardless of whether they're actually open
+- **Flat cost estimates per category** — budget scoring uses hardcoded CNY values per category (e.g. all food_dining at ¥120) instead of POI-level price data, making budget fit scores unreliable
+- **POI candidate pool is small and static** — only 60 candidates fetched from Google Places; when early candidates are filtered out by constraints, no re-ranking or pool expansion occurs, leading to thin days for niche preferences
+- **Claude has no native JSON mode** — OpenAI's `json_object` mode guarantees valid JSON; Claude requires manual regex stripping of markdown fences, which can silently fail on edge cases in the NL parser
 
 ---
 
