@@ -129,6 +129,135 @@ pytest tests/ -v
 
 ---
 
+## Evaluation & Benchmarking
+
+Three scripts are provided for measuring API performance and comparing routing strategies. None of them modify backend code.
+
+### 1. API Performance Evaluation (`eval_api.py`)
+
+Sends 20–50 requests with randomized user profiles and records latency and success rate.
+
+```bash
+pip install requests
+
+# Default: 30 requests → eval_results.csv
+python eval_api.py
+
+# Custom options
+python eval_api.py --n 50 --url http://localhost:8000/api/v1/trips/plan --out my_results.csv
+```
+
+Each request randomly samples a destination, travel pace, budget level, and interest weights to simulate diverse users. Results are written to a CSV file with the following columns:
+
+| Column | Description |
+|---|---|
+| `request_id` | Server-assigned ID from the response |
+| `timestamp` | UTC time of the request |
+| `destination` | City name sent in the request |
+| `duration_days` | Number of travel days |
+| `budget_level` | `budget` / `mid_range` / `luxury` |
+| `travel_pace` | `relaxed` / `moderate` / `intensive` |
+| `interests_snapshot` | Full interest weight dict |
+| `latency_s` | End-to-end response time in seconds |
+| `status_code` | HTTP status code |
+| `success` | `True` if HTTP 200 |
+| `poi_count` | Total POIs across all days |
+| `error_message` | Error text if the request failed |
+
+---
+
+### 2. Report Generator (`eval_report.py`)
+
+Reads the CSV produced above and outputs a console summary plus a two-panel PNG chart.
+
+```bash
+pip install pandas matplotlib
+
+# Default: reads eval_results.csv → saves eval_report.png
+python eval_report.py
+
+# Custom paths
+python eval_report.py --csv my_results.csv --out my_report.png
+```
+
+Console output:
+
+```
+================================================
+  API Evaluation Summary
+================================================
+  Total requests : 30
+  Success        : 28  (93.3%)
+  Failure        : 2
+  Latency avg    : 1.847 s
+  Latency min    : 0.312 s
+  Latency max    : 4.521 s
+  Latency p95    : 3.904 s
+  Latency std    : 0.923 s
+================================================
+```
+
+The PNG contains two charts:
+
+- **Left** — Response time histogram with mean (red dashed) and p95 (orange dotted) lines
+- **Right** — Average latency per `travel_pace` group, with sample counts on each bar
+
+---
+
+### 3. Baseline Router (`app/core/baseline_router.py`)
+
+Provides two reference routing strategies with the same interface as `RouteOptimizer`, for measuring the value of POI scoring and nearest-neighbour ordering.
+
+| Class | Strategy | Purpose |
+|---|---|---|
+| `RandomBaseline` | Random shuffle | Lower bound — any real method should beat this |
+| `DistanceOnlyBaseline` | Nearest-neighbour, ignores scores | Isolates the value of interest-aware scoring |
+
+**Comparing against your method:**
+
+```python
+from app.core.baseline_router import RandomBaseline, DistanceOnlyBaseline, total_distance_km
+
+your_result  = route_optimizer.optimize(day_pois)
+rand_result  = RandomBaseline(seed=42).optimize(day_pois)
+dist_result  = DistanceOnlyBaseline().optimize(day_pois)
+
+your_km = total_distance_km([sp.poi for sp in your_result])
+rand_km = total_distance_km([sp.poi for sp in rand_result])
+dist_km = total_distance_km([sp.poi for sp in dist_result])
+
+print(f"Your method   : {your_km:.2f} km")
+print(f"Random        : {rand_km:.2f} km")
+print(f"Distance-only : {dist_km:.2f} km")
+```
+
+**One-call comparison with percentage deltas:**
+
+```python
+from app.core.baseline_router import compare
+
+result = compare(day_pois, your_result)
+# {
+#   'your_distance_km': 8.4,
+#   'random_distance_km': 14.1,        'vs_random_pct': 40.4,
+#   'distance_only_distance_km': 7.9,  'vs_distance_only_pct': -6.3
+# }
+```
+
+A positive `vs_*_pct` means your method produces a shorter route than the baseline. A negative value means the baseline is shorter.
+
+**Running the full evaluation workflow:**
+
+```bash
+# Step 1 — collect API performance data
+python eval_api.py --n 50
+
+# Step 2 — generate charts and summary
+python eval_report.py
+```
+
+---
+
 ## Configuration
 
 All settings are controlled via `.env`. The project runs fully in **mock mode** by default — no API keys required.
@@ -180,13 +309,17 @@ intelligent-trip-planner/
 ├── requirements.txt
 ├── .env.example
 │
+├── eval_api.py                    # API performance evaluator (sends 20–50 requests, writes CSV)
+├── eval_report.py                 # Report generator (reads CSV, outputs stats + PNG charts)
+│
 ├── app/
 │   ├── api/v1/                    # Route handlers
 │   ├── core/                      # Deterministic planning logic
 │   │   ├── persona_builder.py
 │   │   ├── poi_scorer.py
 │   │   ├── day_allocator.py
-│   │   └── route_optimizer.py
+│   │   ├── route_optimizer.py
+│   │   └── baseline_router.py     # Baseline strategies for comparison (random, distance-only)
 │   ├── services/                  # Orchestration layer
 │   ├── integrations/              # POI, Maps, Weather providers
 │   ├── llm/                       # LLM providers and prompt templates
