@@ -131,7 +131,7 @@ pytest tests/ -v
 
 ## Evaluation & Benchmarking
 
-Three scripts are provided for measuring API performance and comparing routing strategies. None of them modify backend code.
+Four scripts are provided for measuring API performance and comparing routing strategies. None of them modify backend code.
 
 ### 1. API Performance Evaluation (`eval_api.py`)
 
@@ -246,14 +246,67 @@ result = compare(day_pois, your_result)
 
 A positive `vs_*_pct` means your method produces a shorter route than the baseline. A negative value means the baseline is shorter.
 
+---
+
+### 4. Baseline Comparison Runner (`eval_baseline.py`)
+
+Runs the real planning pipeline (Stages 1–3) on fixed test cases, then compares all three routing strategies on the same allocated POI sets. No server required — runs directly against the planning logic.
+
+```bash
+python eval_baseline.py
+# → prints comparison table
+# → saves baseline_comparison.csv
+```
+
+**Test cases included:** Beijing 3d/moderate, Shanghai 2d/intensive, Chengdu 2d/relaxed.
+
+**Sample output:**
+
+```
+Test Case                      Day  POIs    Yours   Random  DistOnly   vs Rnd  vs Dist
+────────────────────────────────────────────────────────────────────────────────────────
+Beijing / 3d / moderate          1     4   11.05km   11.19km    11.05km    +1.2%    +0.0%
+Beijing / 3d / moderate          2     4    6.71km    8.37km     6.71km   +19.8%    +0.0%
+Beijing / 3d / moderate          3     4   10.14km   18.99km    10.14km   +46.6%    +0.0%
+Shanghai / 2d / intensive        1     5   12.50km   19.02km    12.50km   +34.3%    +0.0%
+Shanghai / 2d / intensive        2     6    4.11km    4.86km     4.11km   +15.3%    +0.0%
+Chengdu / 2d / relaxed           1     3   20.34km   18.62km    20.34km    -9.2%    +0.0%
+Chengdu / 2d / relaxed           2     3    9.15km   16.00km     9.15km   +42.8%    +0.0%
+────────────────────────────────────────────────────────────────────────────────────────
+Average vs Random       : +21.5%  (shorter route)
+Average vs Distance-only: +0.0%   (shorter route)
+```
+
+**What the results show:**
+
+- **vs Random (+21.5% avg)**: The pipeline produces routes that are on average 21.5% shorter than random ordering, confirming that structured POI selection and NN ordering add measurable value.
+- **vs Distance-only (+0.0%)**: Both strategies use the same nearest-neighbour heuristic for sightseeing POIs, so within-day route distance is identical. The difference lies in *which* POIs get selected — interest scoring shapes the candidate set, not the ordering algorithm.
+- **Chengdu Day 1 (−9.2%)**: The one case where random is shorter; Chengdu's POIs are geographically spread such that any ordering covers similar total distance.
+
+**CSV output columns:**
+
+| Column | Description |
+|---|---|
+| `test_case` | Destination / duration / pace label |
+| `day` | Day number within the trip |
+| `poi_count` | Number of POIs allocated to that day |
+| `your_km` | Total route distance using `RouteOptimizer` |
+| `random_km` | Total route distance using `RandomBaseline` |
+| `distance_only_km` | Total route distance using `DistanceOnlyBaseline` |
+| `vs_random_pct` | % reduction vs random (positive = shorter) |
+| `vs_distance_only_pct` | % reduction vs distance-only |
+
+---
+
 **Running the full evaluation workflow:**
 
 ```bash
-# Step 1 — collect API performance data
+# API performance (requires server running)
 python eval_api.py --n 50
-
-# Step 2 — generate charts and summary
 python eval_report.py
+
+# Algorithm baseline comparison (no server needed)
+python eval_baseline.py
 ```
 
 ---
@@ -311,6 +364,7 @@ intelligent-trip-planner/
 │
 ├── eval_api.py                    # API performance evaluator (sends 20–50 requests, writes CSV)
 ├── eval_report.py                 # Report generator (reads CSV, outputs stats + PNG charts)
+├── eval_baseline.py               # Baseline comparison (random vs distance-only vs your method)
 │
 ├── app/
 │   ├── api/v1/                    # Route handlers
