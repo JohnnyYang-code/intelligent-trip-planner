@@ -131,7 +131,7 @@ pytest tests/ -v
 
 ## Evaluation & Benchmarking
 
-Four scripts are provided for measuring API performance and comparing routing strategies. None of them modify backend code.
+Eight scripts are provided for measuring system performance across five dimensions. None of them modify backend code.
 
 ### 1. API Performance Evaluation (`eval_api.py`)
 
@@ -162,7 +162,11 @@ Each request randomly samples a destination, travel pace, budget level, and inte
 | `status_code` | HTTP status code |
 | `success` | `True` if HTTP 200 |
 | `poi_count` | Total POIs across all days |
+| `poi_per_day_avg` | Average POIs per day in the response |
+| `pace_in_range` | `True` if every day's POI count falls within the pace target window |
 | `error_message` | Error text if the request failed |
+
+The summary output also prints **pace control accuracy** per pace tier — the fraction of trips where every day's POI count fell within the expected range (relaxed 2–3, moderate 3–4, intensive 5–6).
 
 ---
 
@@ -206,12 +210,20 @@ The PNG contains two charts:
 
 ### 3. Baseline Router (`app/core/baseline_router.py`)
 
-Provides two reference routing strategies with the same interface as `RouteOptimizer`, for measuring the value of POI scoring and nearest-neighbour ordering.
+Provides three reference strategies for measuring the value of personalized scoring and nearest-neighbour ordering.
+
+**Routing baselines** (same interface as `RouteOptimizer` — reorder a day's POI list):
 
 | Class | Strategy | Purpose |
 |---|---|---|
 | `RandomBaseline` | Random shuffle | Lower bound — any real method should beat this |
 | `DistanceOnlyBaseline` | Nearest-neighbour, ignores scores | Isolates the value of interest-aware scoring |
+
+**Selection baseline** (operates on the full scored-POI pool before day allocation):
+
+| Class | Strategy | Purpose |
+|---|---|---|
+| `PopularityBaseline` | Top-N by raw `popularity_score` | Measures how much interest-aware scoring adds over "most popular first" |
 
 **Comparing against your method:**
 
@@ -298,15 +310,95 @@ Average vs Distance-only: +0.0%   (shorter route)
 
 ---
 
+### 5. Personalization Score Evaluation (`eval_personalization.py`)
+
+Measures interest alignment — the mean `interest_score` component of selected POIs — and compares your system against `PopularityBaseline` (top-N by raw popularity). No server required.
+
+```bash
+python eval_personalization.py
+# → prints per-test-case table + average improvement %
+# → saves personalization_results.csv
+```
+
+**Metric — interest alignment:** mean of `score_breakdown.interest_score` across all selected POIs. Higher = selected POIs better match the traveler's stated interests.
+
+**CSV columns:** `test_case`, `n_selected`, `your_interest_alignment`, `popularity_interest_alignment`, `your_total_score_avg`, `popularity_total_score_avg`, `interest_improvement_pct`.
+
+---
+
+### 6. Latency Comparison (`eval_latency.py`)
+
+Measures end-to-end pipeline latency in two modes — mock LLM (deterministic templates) and real LLM (Claude/OpenAI) — and isolates the LLM narration overhead. No server required; switches providers in-process.
+
+```bash
+python eval_latency.py               # auto-detects LLM from .env, n=15
+python eval_latency.py --n 20
+python eval_latency.py --no-real-llm  # mock-only (no API key needed)
+# → prints comparison table (mean / p95 / overhead)
+# → saves latency_comparison.csv
+```
+
+---
+
+### 7. Constraint Compliance Evaluation (`eval_constraints.py`)
+
+Sends targeted requests with specific constraint configurations and verifies that the pipeline's output respects every rule. Requires the server to be running.
+
+```bash
+uvicorn main:app --reload
+python eval_constraints.py
+# → prints pass/fail per test + aggregate summary
+# → saves constraint_results.csv
+```
+
+**Checks performed:**
+
+| Check | Type | Expected |
+|---|---|---|
+| `avoid_categories` respected | Hard block | 0 violations |
+| `accessibility_required` respected | Hard block | 0 violations |
+| Food/dining cap (≤ 3/day) | Structural | 0 violations |
+| Diversity guarantee (≥ 1 non-food/day) | Structural | 0 violations |
+| `with_children` — child-unfriendly POI rate | Soft penalty | Reported (not zeroed) |
+
+---
+
+### 8. Hallucination / Grounding Check (`eval_hallucination.py`)
+
+Verifies that LLM-generated text fields are grounded in the actual itinerary. Requires the server running with a real LLM provider.
+
+```bash
+LLM_PROVIDER=claude uvicorn main:app --reload
+python eval_hallucination.py --n 15
+# → prints per-request grounding stats
+# → saves hallucination_results.csv
+```
+
+**Three checks:**
+
+| Metric | Definition | Target |
+|---|---|---|
+| POI name mention rate | % of `recommendation_reason` fields that contain the POI's name | ≈ 100% |
+| Narrative coverage rate | % of days where `narrative` mentions ≥ 1 scheduled POI | ≈ 100% |
+| Overview destination mention | `overview` contains the destination city name | ≈ 100% |
+
+---
+
 **Running the full evaluation workflow:**
 
 ```bash
-# API performance (requires server running)
-python eval_api.py --n 50
-python eval_report.py
+# No server needed (in-process pipeline calls)
+python eval_personalization.py       # metric 1: personalization vs popularity baseline
+python eval_baseline.py              # metric 2: route distance vs random / distance-only
+python eval_latency.py               # metric 3: latency with vs without LLM
 
-# Algorithm baseline comparison (no server needed)
-python eval_baseline.py
+# Requires: uvicorn main:app --reload
+python eval_api.py --n 30            # metric 4: API success rate + pace accuracy
+python eval_report.py                # generate latency charts
+python eval_constraints.py           # metric 5: constraint compliance
+
+# Requires: LLM_PROVIDER=claude uvicorn main:app --reload
+python eval_hallucination.py --n 15  # metric 6: explanation grounding
 ```
 
 ---
@@ -362,9 +454,13 @@ intelligent-trip-planner/
 ├── requirements.txt
 ├── .env.example
 │
-├── eval_api.py                    # API performance evaluator (sends 20–50 requests, writes CSV)
+├── eval_api.py                    # API performance + pace accuracy (sends 20–50 requests, writes CSV)
 ├── eval_report.py                 # Report generator (reads CSV, outputs stats + PNG charts)
-├── eval_baseline.py               # Baseline comparison (random vs distance-only vs your method)
+├── eval_baseline.py               # Route baseline comparison (random vs distance-only vs your method)
+├── eval_personalization.py        # Personalization score vs PopularityBaseline
+├── eval_latency.py                # Latency breakdown: mock LLM vs real LLM (in-process)
+├── eval_constraints.py            # Constraint compliance audit (HTTP-based, requires server)
+├── eval_hallucination.py          # LLM grounding / hallucination check (HTTP-based, requires real LLM)
 │
 ├── app/
 │   ├── api/v1/                    # Route handlers
@@ -373,7 +469,7 @@ intelligent-trip-planner/
 │   │   ├── poi_scorer.py
 │   │   ├── day_allocator.py
 │   │   ├── route_optimizer.py
-│   │   └── baseline_router.py     # Baseline strategies for comparison (random, distance-only)
+│   │   └── baseline_router.py     # Baseline strategies (random, distance-only, popularity-only)
 │   ├── services/                  # Orchestration layer
 │   ├── integrations/              # POI, Maps, Weather providers
 │   ├── llm/                       # LLM providers and prompt templates
