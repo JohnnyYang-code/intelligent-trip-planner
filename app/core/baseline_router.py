@@ -204,6 +204,35 @@ class DistanceOnlyBaseline:
 StrategyName = Literal["random", "distance_only"]
 
 
+# ── Baseline C: Popularity-Only POI Selection ───────────────��─────────────────
+
+class PopularityBaseline:
+    """
+    Selects top-N POIs purely by raw popularity score, ignoring all persona
+    interest weights, budget fit, and constraint multipliers.
+
+    Intended use: measure how much interest-aware scoring adds over a naive
+    "most popular first" selection policy.  Compare the interest_alignment of
+    your system's final itinerary against this baseline's selection to quantify
+    the personalization gain.
+
+    Note: this is a *selection* baseline, not a *routing* baseline.  It operates
+    on the full scored-POI pool (Stage 2 output) before day allocation.
+    """
+
+    def select(
+        self,
+        scored_pois: list[ScoredPOI],
+        n: int,
+    ) -> list[ScoredPOI]:
+        """Return the top-n ScoredPOIs ranked by raw popularity_score."""
+        return sorted(
+            scored_pois,
+            key=lambda sp: sp.poi.popularity_score,
+            reverse=True,
+        )[:n]
+
+
 def compare(
     day_pois: list[ScoredPOI],
     your_result: list[ScheduledPOI],

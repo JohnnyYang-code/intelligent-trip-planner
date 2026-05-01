@@ -44,8 +44,17 @@ CSV_FIELDS = [
     "status_code",
     "success",
     "poi_count",
+    "poi_per_day_avg",
+    "pace_in_range",
     "error_message",
 ]
+
+# Expected POI-per-day range per travel pace.
+PACE_TARGETS: dict[str, tuple[int, int]] = {
+    "relaxed":   (2, 3),
+    "moderate":  (3, 4),
+    "intensive": (5, 6),
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -83,6 +92,8 @@ def run_request(url: str, payload: dict) -> dict:
         "status_code": None,
         "success": False,
         "poi_count": 0,
+        "poi_per_day_avg": None,
+        "pace_in_range": None,
         "error_message": "",
     }
 
@@ -96,10 +107,14 @@ def run_request(url: str, payload: dict) -> dict:
             data = resp.json()
             row["success"] = True
             row["request_id"] = data.get("request_id", "")
-            # Count total POIs across all days
-            row["poi_count"] = sum(
-                len(day.get("pois", [])) for day in data.get("days", [])
-            )
+            days = data.get("days", [])
+            day_counts = [len(day.get("pois", [])) for day in days]
+            row["poi_count"] = sum(day_counts)
+            # Pace control accuracy
+            if day_counts:
+                row["poi_per_day_avg"] = round(sum(day_counts) / len(day_counts), 2)
+                lo, hi = PACE_TARGETS.get(payload["travel_pace"], (0, 99))
+                row["pace_in_range"] = all(lo <= c <= hi for c in day_counts)
         else:
             row["error_message"] = resp.text[:200]
 
@@ -163,6 +178,23 @@ def main():
         sorted_lat = sorted(latencies)
         p95_idx = int(len(sorted_lat) * 0.95)
         print(f"Latency p95    : {sorted_lat[p95_idx]:.3f}s")
+
+    # Pace control accuracy per pace tier
+    pace_rows = [r for r in successes if r.get("pace_in_range") is not None]
+    if pace_rows:
+        print(f"{'─'*55}")
+        print(f"Pace control accuracy (POIs/day within target range):")
+        for pace, (lo, hi) in PACE_TARGETS.items():
+            tier_rows = [r for r in pace_rows if r["travel_pace"] == pace]
+            if not tier_rows:
+                continue
+            in_range = sum(1 for r in tier_rows if r["pace_in_range"] is True)
+            print(
+                f"  {pace:<10} target={lo}–{hi}  "
+                f"in-range={in_range}/{len(tier_rows)}  "
+                f"({100*in_range/len(tier_rows):.1f}%)"
+            )
+
     print(f"CSV saved to   : {args.out}")
 
 
